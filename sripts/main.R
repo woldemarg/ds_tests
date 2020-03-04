@@ -16,7 +16,7 @@ weather <- read_csv("data/encoded/weather_Hokkaido.csv")
 names(rakuten) <- description$`Row(EN)`[1:48]
 names(jalan) <- description$`Row(EN)`[49:94]
 
-
+#parsing dates
 get_date <- function(timestamp, format = "Y/m/d H:M") {
   return(date(parse_date_time(timestamp, format)))
 }
@@ -30,6 +30,11 @@ events <- events %>%
     end_date = get_date(end_date, "Y/m/d"),
   )
 
+weather <- weather %>%
+  mutate(date = get_date(date, "Y/m/d"))
+
+
+#looking for identival columns within datasets
 jalan_filtered <- jalan %>%
   mutate(
     company_name = "jalan",
@@ -92,6 +97,49 @@ rakuten_filtered <- rakuten %>%
 df_joined <- bind_rows(jalan_filtered, rakuten_filtered)
 df_joined$arrival_flight[df_joined$arrival_flight == "0"] <- NA
 
+#exploring weather conditions
+df_cancelled <- df_joined %>% filter(
+  is_cancelled == 1 &
+    month(pickup_date) %in% c(12, 1, 2) &    #particular in winter
+    (
+      cancellation_date == pickup_date |
+        cancellation_date - pickup_date < 2
+    )
+)
+
+#according to https://en.wikipedia.org/wiki/Chitose,_Hokkaido
+#in japanese Chitose is 千歳市, hereinafter correpondent city_id is 1536
+city_weather <- weather %>% filter(city_id == 1536)
+
+df_cancelled <- df_cancelled %>%
+  inner_join(city_weather, by = c("pickup_date" = "date"))
+
+weather_conditions <- df_cancelled %>%
+  group_by(conditions) %>%
+  summarise(count = n()) %>%
+  arrange(desc(count))
+
+cloudy <- weather_conditions[1:7, 1]
+
+day = as.Date("2018-02-18")
+t <- is_bad_weather(day)
+
+is_bad_weather <- function(day,
+                           id = 1536,
+                           data = weather) {
+  day_weather <-
+    data %>% filter(city_id == id & date == day)
+  
+  if (nrow(day_weather) == 0) {
+    return(0)
+  }
+  
+  x <- ifelse(day_weather$conditions %in% cloudy$conditions &
+                  day_weather$low_temp < 0, 1, 0)
+}
+
+
+#dealing with events outside the city
 sum_up_events <- function(date,
                           city_id_excl = 1536,
                           city_centre = c(141.650876, 42.8209577),
@@ -128,11 +176,11 @@ sum_up_events <- function(date,
   ls <- as.list(events_groupped[1,])
 }
 
-events_sum_up_ls <- lapply(df_joined$pickup_date, sum_up_events)
+events_sum_up_ls <- lapply(unique(df_joined$pickup_date), sum_up_events)
 
 events_sum_up_df <-
   as_tibble(t(matrix(
-    unlist(events_sum_up_ls), nrow = length(unlist(f[1]))
+    unlist(events_sum_up_ls), nrow = length(unlist(events_sum_up_ls[1]))
   )), .name_repair = "unique")
 
 names(events_sum_up_df) <- c("date",
@@ -142,11 +190,15 @@ names(events_sum_up_df) <- c("date",
 
 events_sum_up_df$date <- as_date(events_sum_up_df$date)
 
-#according to https://en.wikipedia.org/wiki/Chitose,_Hokkaido
-#in japanese Chitose is 千歳市, correpondent city_id is 1536
-df_extended <- df_joined %>%
-  mutate(day_of_week = wday(pickup_date, label = TRUE),
-         is_holiday = holidays$Japan[match(pickup_date, holidays$day)]) %>%
-  left_join(events_sum_up_df, by = c("pickup_date" = "date"))
 
-df_extended$month <- month(df_extended$pickup_date) 
+df_extended <- df_joined %>%
+  mutate(
+    day_of_week = wday(pickup_date, label = TRUE),
+    is_holiday = holidays$Japan[match(pickup_date, holidays$day)],
+    
+    ) %>%
+  inner_join(events_sum_up_df, by = c("pickup_date" = "date"))
+
+df_extended$month <- month(df_extended$pickup_date)
+df_extended$dfg <- is_bad_weather(df_extended$pickup_date)
+
