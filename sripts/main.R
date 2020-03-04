@@ -31,7 +31,8 @@ events <- events %>%
   )
 
 weather <- weather %>%
-  mutate(date = get_date(date, "Y/m/d"))
+  mutate(date = get_date(date, "Y/m/d")) %>%
+  distinct(date, city_id, .keep_all = TRUE)
 
 
 #looking for identival columns within datasets
@@ -135,7 +136,9 @@ is_bad_weather <- function(day,
   }
   
   x <- ifelse(day_weather$conditions %in% cloudy$conditions &
-                  day_weather$low_temp < 0, 1, 0)
+                day_weather$low_temp < 0,
+              1,
+              0)
 }
 
 
@@ -173,10 +176,11 @@ sum_up_events <- function(date,
               dur = mean(duration)) %>%
     ungroup()
   
-  ls <- as.list(events_groupped[1,])
+  ls <- as.list(events_groupped[1, ])
 }
 
-events_sum_up_ls <- lapply(unique(df_joined$pickup_date), sum_up_events)
+events_sum_up_ls <-
+  lapply(unique(df_joined$pickup_date), sum_up_events)
 
 events_sum_up_df <-
   as_tibble(t(matrix(
@@ -192,13 +196,9 @@ events_sum_up_df$date <- as_date(events_sum_up_df$date)
 
 
 df_extended <- df_joined %>%
-  mutate(
-    day_of_week = wday(pickup_date, label = TRUE),
-    is_holiday = holidays$Japan[match(pickup_date, holidays$day)],
-    
-    ) %>%
+  mutate(day_of_week = wday(pickup_date, label = TRUE),
+         is_holiday = holidays$Japan[match(pickup_date, holidays$day)],) %>%
   inner_join(events_sum_up_df, by = c("pickup_date" = "date"))
 
 df_extended$month <- month(df_extended$pickup_date)
 df_extended$dfg <- is_bad_weather(df_extended$pickup_date)
-
