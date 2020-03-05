@@ -50,8 +50,6 @@ jalan_filtered <- jalan %>%
     request_date,
     cancellation_date,
     is_cancelled,
-    car_class,
-    transmission,
     num_of_passengers,
     num_of_children,
     arrival_flight,
@@ -82,8 +80,6 @@ rakuten_filtered <- rakuten %>%
     request_date,
     cancellation_date,
     is_cancelled,
-    car_class,
-    transmission,
     num_of_passengers,
     num_of_children,
     arrival_flight,
@@ -156,7 +152,7 @@ sum_up_events <- function(date,
               dur = mean(duration)) %>%
     ungroup()
   
-  ls <- as.list(events_groupped[1, ])
+  ls <- as.list(events_groupped[1,])
 }
 
 events_sum_up_ls <-
@@ -180,8 +176,8 @@ lookup <- df_joined %>% filter(is_cancelled == 0) %>%
   mutate(duration = ifelse(return_date - pickup_date == 0,
                            1,
                            return_date - pickup_date)) %>%
-  group_by(company_name, car_class) %>%
-  summarise(encoded_car_company = mean(total_price) / mean(duration)) %>%
+  group_by(company_name) %>%
+  summarise(encoded_company = mean(total_price) / mean(duration)) %>%
   ungroup()
 
 
@@ -194,8 +190,24 @@ df_extended <- df_joined %>%
     
   ) %>%
   left_join(events_sum_up_df, by = c("pickup_date" = "date")) %>%
-  left_join(lookup, by = c("company_name", "car_class"))
+  left_join(lookup, by = "company_name")
 
-df_extended$month <- month(df_extended$pickup_date)
+df_extended$month <- as_factor(month(df_extended$pickup_date))
 
 write_csv(df_extended, "derived/df_extended.csv")
+
+#simple average
+model_data <- df_extended %>%
+  filter(is_cancelled == 0) %>%
+  group_by(pickup_date, company_name) %>%
+  summarise(target = n())
+
+model_data_wide <- model_data %>%
+  pivot_wider(names_from = pickup_date, values_from = target)
+
+model_data_wide[is.na(model_data_wide)] <- 0
+
+model_data <- model_data_wide %>%
+  pivot_longer(names(model_data_wide)[-1],
+               names_to = "pickup_date",
+               values_to = "target")
