@@ -31,8 +31,7 @@ events <- events %>%
   )
 
 weather <- weather %>%
-  mutate(date = get_date(date, "Y/m/d")) %>%
-  distinct(date, city_id, .keep_all = TRUE)
+  mutate(date = get_date(date, "Y/m/d"))
 
 
 #looking for identival columns within datasets
@@ -110,7 +109,8 @@ df_cancelled <- df_joined %>% filter(
 
 #according to https://en.wikipedia.org/wiki/Chitose,_Hokkaido
 #in japanese Chitose is 千歳市, hereinafter correpondent city_id is 1536
-city_weather <- weather %>% filter(city_id == 1536)
+city_weather <- weather %>% filter(city_id == 1536) %>%
+  distinct(date, .keep_all = TRUE)
 
 df_cancelled <- df_cancelled %>%
   inner_join(city_weather, by = c("pickup_date" = "date"))
@@ -122,24 +122,8 @@ weather_conditions <- df_cancelled %>%
 
 cloudy <- weather_conditions[1:7, 1]
 
-day = as.Date("2018-02-18")
-t <- is_bad_weather(day)
-
-is_bad_weather <- function(day,
-                           id = 1536,
-                           data = weather) {
-  day_weather <-
-    data %>% filter(city_id == id & date == day)
-  
-  if (nrow(day_weather) == 0) {
-    return(0)
-  }
-  
-  x <- ifelse(day_weather$conditions %in% cloudy$conditions &
-                day_weather$low_temp < 0,
-              1,
-              0)
-}
+bad_weather <- city_weather %>%
+  filter(conditions %in% cloudy$conditions & low_temp < 0)
 
 
 #dealing with events outside the city
@@ -176,7 +160,7 @@ sum_up_events <- function(date,
               dur = mean(duration)) %>%
     ungroup()
   
-  ls <- as.list(events_groupped[1, ])
+  ls <- as.list(events_groupped[1,])
 }
 
 events_sum_up_ls <-
@@ -196,9 +180,15 @@ events_sum_up_df$date <- as_date(events_sum_up_df$date)
 
 
 df_extended <- df_joined %>%
-  mutate(day_of_week = wday(pickup_date, label = TRUE),
-         is_holiday = holidays$Japan[match(pickup_date, holidays$day)],) %>%
+  mutate(
+    day_of_week = wday(pickup_date, label = TRUE),
+    is_holiday = holidays$Japan[match(pickup_date, holidays$day)],
+    is_bad_weather = ifelse(pickup_date %in% bad_weather$date, 1, 0)
+  ) %>%
   inner_join(events_sum_up_df, by = c("pickup_date" = "date"))
 
 df_extended$month <- month(df_extended$pickup_date)
-df_extended$dfg <- is_bad_weather(df_extended$pickup_date)
+
+d <- df_extended %>%
+  group_by(company_name, car_class) %>%
+  summarise(cnt = n())
