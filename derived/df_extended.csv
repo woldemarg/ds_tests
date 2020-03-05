@@ -1,4 +1,4 @@
-company_name,request_date,pickup_date,return_date,cancellation_date,is_cancelled,car_class,transmission,num_of_passengers,num_of_children,arrival_flight,total_price,day_of_week,is_holiday,is_bad_weather,events_count,events_avg_distance,events_avg_duration,encoded_company_class,month
+company_name,request_date,pickup_date,return_date,cancellation_date,is_cancelled,car_class,transmission,num_of_passengers,num_of_children,arrival_flight,total_price,day_of_week,is_holiday,is_bad_weather,events_count,events_avg_distance,events_avg_duration,encoded_car_company,month
 jalan,2016-02-17,2016-03-20,2016-03-22,NA,0,Sクラス(SCS001),AT,2,0,GK101,7000,Sun,1,0,6,70303.02972715124,1,5093.3183949973945,3
 jalan,2016-02-23,2016-03-05,2016-03-07,NA,0,Sクラス喫煙（SCS002）,AT,2,0,AIRDO113,9740,Sat,0,0,13,34665.037105166244,1.1538461538461537,4890.206896551724,3
 jalan,2016-02-25,2016-03-19,2016-03-22,NA,0,Fクラス(SCF001),AT,2,0,JAL519,22740,Sat,1,0,12,41336.864675872566,2.3333333333333335,10547.514563106797,3

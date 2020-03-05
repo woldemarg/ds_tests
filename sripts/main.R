@@ -181,7 +181,7 @@ lookup <- df_joined %>% filter(is_cancelled == 0) %>%
                            1,
                            return_date - pickup_date)) %>%
   group_by(company_name, car_class) %>%
-  summarise(encoded_company_class = mean(total_price) / mean(duration)) %>%
+  summarise(encoded_car_company = mean(total_price) / mean(duration)) %>%
   ungroup()
 
 
