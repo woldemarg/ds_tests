@@ -1,6 +1,13 @@
 library(tidyverse)
 library(lubridate)
 library(geosphere)
+library(randomForest)
+library(glmnet)
+library(fastDummies)
+library(splus2R)
+
+
+
 
 description <- read_csv("data/encoded/columns_description.csv")
 events <- read_csv("data/encoded/events_Hokkaido.csv")
@@ -171,33 +178,19 @@ names(events_sum_up_df) <- c("date",
 events_sum_up_df$date <- as_date(events_sum_up_df$date)
 
 
-#target encoding company_car feature by average price per day
-lookup <- df_joined %>% filter(is_cancelled == 0) %>%
-  mutate(duration = ifelse(return_date - pickup_date == 0,
-                           1,
-                           return_date - pickup_date)) %>%
-  group_by(company_name) %>%
-  summarise(encoded_company = mean(total_price) / mean(duration)) %>%
-  ungroup()
+#target encoding company by average price per day
+#
+# lookup <- df_joined %>% filter(is_cancelled == 0) %>%
+#   mutate(duration = ifelse(return_date - pickup_date == 0,
+#                            1,
+#                            return_date - pickup_date)) %>%
+#   group_by(company_name) %>%
+#   summarise(encoded_company = mean(total_price) / mean(duration)) %>%
+#   ungroup()
 
 
-#combining
-df_extended <- df_joined %>%
-  mutate(
-    day_of_week = wday(pickup_date, label = TRUE),
-    is_holiday = holidays$Japan[match(pickup_date, holidays$day)],
-    is_bad_weather = ifelse(pickup_date %in% bad_weather$date, 1, 0),
-    
-  ) %>%
-  left_join(events_sum_up_df, by = c("pickup_date" = "date")) %>%
-  left_join(lookup, by = "company_name")
-
-df_extended$month <- as_factor(month(df_extended$pickup_date))
-
-write_csv(df_extended, "derived/df_extended.csv")
-
-#simple average
-model_data <- df_extended %>%
+#preparing data
+model_data <- df_joined %>%
   filter(is_cancelled == 0) %>%
   group_by(pickup_date, company_name) %>%
   summarise(target = n())
@@ -211,3 +204,127 @@ model_data <- model_data_wide %>%
   pivot_longer(names(model_data_wide)[-1],
                names_to = "pickup_date",
                values_to = "target")
+
+model_data$pickup_date <- as_date(model_data$pickup_date)
+
+model_data <- model_data %>%
+  mutate(
+    day_of_week = as_factor(as.character(wday(pickup_date, label = TRUE))),
+    month = as_factor(month(pickup_date)),
+    is_holiday = holidays$Japan[match(pickup_date, holidays$day)],
+    is_bad_weather = ifelse(pickup_date %in% bad_weather$date, 1, 0)
+  ) %>%
+  left_join(events_sum_up_df, by = c("pickup_date" = "date")) %>%
+  #left_join(lookup, by = "company_name") %>%
+  select(-pickup_date)
+
+model_data$company_name <- as_factor(model_data$company_name)
+
+rf_mod <- tuneRF(
+  x = model_data[names(model_data) != "target"],
+  y = model_data[["target"]],
+  ntreeTry = 1500,
+  stepFactor = 1.5,
+  improve = 1e-5,
+  #classwt = wt,
+  trace = FALSE,
+  plot = FALSE,
+  doBest = TRUE
+)
+
+str(model_data)
+
+train <-
+  dummy_cols(
+    model_data,
+    select_columns = c("company_name", "day_of_week", "month"),
+    remove_first_dummy = TRUE,
+    remove_selected_columns = TRUE
+  )
+
+str(train)
+
+cv_ridge <- cv.glmnet(
+  x = as.matrix(train[names(train) != "target"]),
+  y = train[["target"]],
+  nfolds = 10,
+  standardize = TRUE,
+  alpha = 0
+)
+
+cv_ridge
+
+cv_ridge$glmnet.fit$dev.ratio[which(cv_ridge$glmnet.fit$lambda == cv_ridge$lambda.min)]
+
+rf_mod
+
+varImpPlot(rf_mod, type = 2)
+
+change_pseudo_num_cols_to_factors <- function(data, lim = 15) {
+  sum <- get_summary(data)
+  pseudo_num <- sum %>%
+    filter(cls == "numeric" &
+             unq < lim &
+             !(fnm %in% c(ords$f, "OverallQual", "OverallCond"))) %>%
+    select(fnm) %>%
+    pull(fnm)
+  v <- model_data$events_avg_distance
+  n_vars <-
+    as_tibble(lapply(data[pseudo_num], function(v) {
+      t <- table(v)
+      p <- peaks(t)
+      p
+      n <- names(t)
+      n[p]
+      b <- as.numeric(c("0", n[p], Inf))
+      b
+      
+      b <- if (length(n[p]) == 0) {
+        c("-1", "0", n[length(n)])
+      } else {
+        if ("0" %in% n[p]) {
+          c("-1", n[p], n[length(n)])
+        } else {
+          if ("0" %in% n) {
+            c("-1", "0", n[p], n[length(n)])
+          } else {
+            c(n[1], n[p], n[length(n)])
+          }
+        }
+      }
+      return(cut(v, breaks = as.numeric(b), include.lowest = TRUE))
+    }))
+  
+  
+  #Randomly shuffle the data
+  d <- model_data[sample(nrow(model_data)), 1:4]
+  
+  #Create 10 equally size folds
+  folds <- cut(seq(1, nrow(d)), breaks = 10, labels = FALSE)
+  #Perform 10 fold cross validation
+  rsq <- function (x, y)
+    cor(x, y) ^ 2
+  
+  rmse <- c()
+  r2 <- c()
+  
+  for (i in 1:10) {
+    #Segement your data by fold using the which() function
+    testIndexes <- which(folds == i, arr.ind = TRUE)
+    testData <- d[testIndexes,]
+    trainData <- d[-testIndexes,]
+    #Use the test and train data partitions however you desire...
+    mean_model <- trainData %>%
+      group_by(company_name, month, day_of_week) %>%
+      summarize(predicts = mean(target))
+    
+    testData <- testData %>%
+      left_join(mean_model, by = c("company_name", "month", "day_of_week"))
+    
+    rmse[i] <- sqrt(sum(testData$predicts - testData$target) ^ 2)
+    
+    r2[i] <- rsq(testData$predicts, testData$target)
+  }
+  mean(rmse)
+  mean(r2)
+  
