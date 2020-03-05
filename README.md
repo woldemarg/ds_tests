@@ -10,15 +10,18 @@ My assumptions:
 4. Rental frequency might depend on company name and car park available
 
 Data available for predictioning:
-1. Day of week
+1. Date(i.e. day of week and month
 2. Schedule of events in neighbourhood areas
 3. Weather forecast
 4. Company name
 5. Car class
 
 Hypothesis:
-1. Do number of cancellations correspond with a bad weather conditions (suggesting changes in flight schedule)?
+1. Do number of cancellations correspond with a bad weather conditions (suggesting intention to avoid risky driving)?
 2. Will introducing such a new feature as car_company with further target encoding by average price per day improve our model?
+
+Model valuation
+Compare with naive approach to calculate average number of orders for company_class grouped by day of week and month
 
 
 Further improvements:

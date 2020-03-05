@@ -1,7 +1,3 @@
-#install.packages("tidyverse")
-#install.packages("lubridate")
-#install.packages("geosphere")
-
 library(tidyverse)
 library(lubridate)
 library(geosphere)
@@ -34,7 +30,7 @@ weather <- weather %>%
   mutate(date = get_date(date, "Y/m/d"))
 
 
-#looking for identival columns within datasets
+#identical columns within datasets
 jalan_filtered <- jalan %>%
   mutate(
     company_name = "jalan",
@@ -126,7 +122,7 @@ bad_weather <- city_weather %>%
   filter(conditions %in% cloudy$conditions & low_temp < 0)
 
 
-#dealing with events outside the city
+#summing up events outside the city
 sum_up_events <- function(date,
                           city_id_excl = 1536,
                           city_centre = c(141.650876, 42.8209577),
@@ -160,7 +156,7 @@ sum_up_events <- function(date,
               dur = mean(duration)) %>%
     ungroup()
   
-  ls <- as.list(events_groupped[1,])
+  ls <- as.list(events_groupped[1, ])
 }
 
 events_sum_up_ls <-
@@ -179,16 +175,27 @@ names(events_sum_up_df) <- c("date",
 events_sum_up_df$date <- as_date(events_sum_up_df$date)
 
 
+#target encoding company_car feature by average price per day
+lookup <- df_joined %>% filter(is_cancelled == 0) %>%
+  mutate(duration = ifelse(return_date - pickup_date == 0,
+                           1,
+                           return_date - pickup_date)) %>%
+  group_by(company_name, car_class) %>%
+  summarise(encoded_company_class = mean(total_price) / mean(duration)) %>%
+  ungroup()
+
+
+#combining
 df_extended <- df_joined %>%
   mutate(
     day_of_week = wday(pickup_date, label = TRUE),
     is_holiday = holidays$Japan[match(pickup_date, holidays$day)],
-    is_bad_weather = ifelse(pickup_date %in% bad_weather$date, 1, 0)
+    is_bad_weather = ifelse(pickup_date %in% bad_weather$date, 1, 0),
+    
   ) %>%
-  inner_join(events_sum_up_df, by = c("pickup_date" = "date"))
+  left_join(events_sum_up_df, by = c("pickup_date" = "date")) %>%
+  left_join(lookup, by = c("company_name", "car_class"))
 
 df_extended$month <- month(df_extended$pickup_date)
 
-d <- df_extended %>%
-  group_by(company_name, car_class) %>%
-  summarise(cnt = n())
+write_csv(df_extended, "derived/df_extended.csv")
