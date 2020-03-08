@@ -4,6 +4,7 @@ library(geosphere)
 library(randomForest)
 library(glmnet)
 library(fastDummies)
+library(gbm)
 
 
 
@@ -96,6 +97,7 @@ rakuten_filtered <- rakuten %>%
 df_joined <- bind_rows(jalan_filtered, rakuten_filtered)
 #df_joined$arrival_flight[df_joined$arrival_flight == "0"] <- NA
 
+write_csv(df_joined, "derived/df_joined.csv")
 
 #preparing data
 model_data <- df_joined %>%
@@ -129,14 +131,14 @@ get_cv_rmse_mean_model <- function(data,
            mon = month(pickup_date)) %>%
     select(-pickup_date)
   
-  data <- data[sample(nrow(data)), ]
+  data <- data[sample(nrow(data)),]
   folds <- cut(seq(1, nrow(data)), breaks = k, labels = FALSE)
   rmse <- c()
   
   for (i in 1:k) {
     indices <- which(folds == i, arr.ind = TRUE)
-    test_data <- data[indices, ]
-    train_data <- data[-indices, ]
+    test_data <- data[indices,]
+    train_data <- data[-indices,]
     
     mean_model <- train_data %>%
       group_by(company_name, dow, mon) %>%
@@ -201,13 +203,14 @@ get_events <- function(pickup_day) {
       distm(as.numeric(row[6:7]), c(141.650876, 42.8209577), fun = distHaversine) /
         1000)
   
-  nrow(subset(evs, dist > 60))
+  nrow(subset(evs, dist > 60)) #manual adjustment
 }
 
 model_data$events <- sapply(model_data$pickup_date, get_events)
 
+write_csv(model_data, "derived/model_data.csv")
 
-
+#modelling
 get_cv_rmse_rf_model <- function(data,
                                  k = 10,
                                  seed = 1) {
@@ -216,14 +219,14 @@ get_cv_rmse_rf_model <- function(data,
   data <- data %>%
     select(-pickup_date)
   
-  data <- data[sample(nrow(data)), ]
+  data <- data[sample(nrow(data)),]
   folds <- cut(seq(1, nrow(data)), breaks = k, labels = FALSE)
   rmse <- c()
   
   for (i in 1:k) {
     indices <- which(folds == i, arr.ind = TRUE)
-    test_data <- data[indices, ]
-    train_data <- data[-indices, ]
+    test_data <- data[indices,]
+    train_data <- data[-indices,]
     
     rf_mod = randomForest(target ~ . , data = train_data)
     predicts <- predict(rf_mod, test_data[, -1])
@@ -233,140 +236,170 @@ get_cv_rmse_rf_model <- function(data,
   mean(rmse)
 }
 
-rmse_rf_model <- get_cv_rmse_rf_model(model_data)
-
-model_data$bad_weather <- ifelse(model_data$pickup_date %in% bad_weather$date, 1, 0)
-
-#exploring weather conditions
-df_cancelled <- df_joined %>% filter(
-  is_cancelled == 1 &
-    month(pickup_date) %in% c(12, 1, 2) &    #particular in winter
-    (
-      cancellation_date == pickup_date |
-        cancellation_date - pickup_date < 2
+get_cv_rmse_ridge_model <- function(data,
+                                    k = 10,
+                                    seed = 1) {
+  set.seed(seed)
+  
+  data <- data %>%
+    select(-pickup_date) %>%
+    dummy_cols(
+      select_columns = c("company_name"),
+      remove_first_dummy = TRUE,
+      remove_selected_columns = TRUE
     )
-)
+  
+  data <- data[sample(nrow(data)),]
+  folds <- cut(seq(1, nrow(data)), breaks = k, labels = FALSE)
+  rmse <- c()
+  
+  for (i in 1:k) {
+    indices <- which(folds == i, arr.ind = TRUE)
+    test_data <- data[indices,]
+    train_data <- data[-indices,]
+    
+    cv_ridge <- cv.glmnet(
+      x = as.matrix(train_data[names(train_data) != "target"]),
+      y = train_data[["target"]],
+      nfolds = 10,
+      standardize = TRUE,
+      alpha = 0
+    )
+    
+    predicts <-
+      predict(cv_ridge,
+              s = cv_ridge$lambda.min,
+              newx = as.matrix(test_data[, -1]))
+    
+    rmse[i] <- sqrt(mean((predicts - test_data$target) ^ 2))
+  }
+  mean(rmse)
+}
 
-#according to https://en.wikipedia.org/wiki/Chitose,_Hokkaido
-#in japanese Chitose is 千歳市, hereinafter correpondent city_id is 1536
+rmse_rf_model <- get_cv_rmse_rf_model(model_data)
+rmse_ridge_model <- get_cv_rmse_ridge_model(model_data)
+
+
+
+#trying to deal with weather forcast
 city_weather <- weather %>% filter(city_id == 1536) %>%
-  distinct(date, .keep_all = TRUE)
-
-df_cancelled <- df_cancelled %>%
-  inner_join(city_weather, by = c("pickup_date" = "date"))
-
-weather_conditions <- df_cancelled %>%
-  group_by(conditions) %>%
-  summarise(count = n()) %>%
-  arrange(desc(count))
-
-cloudy <- weather_conditions[1:7, 1]
-
-bad_weather <- city_weather %>%
-  filter(conditions %in% cloudy$conditions & low_temp < 0)
+  distinct(date, .keep_all = TRUE) %>%
+  mutate(avg_temp = (low_temp + high_temp) / 2) %>%
+  select(date, avg_temp) %>%
+  complete(date = seq(date[1], as_date("2019-02-28"), by = "1 day")) %>%
+  fill(avg_temp)
 
 
+rented_cars <- df_joined %>%
+  filter(is_cancelled == 0) %>%
+  mutate(mon = month(pickup_date)) %>%
+  group_by(mon) %>%
+  summarise(rented = n()) %>%
+  ungroup()
 
-train2 <-
-  dummy_cols(
-    train,
-    select_columns = c("company_name", "month", "day_of_week", "events_count"),
-    remove_first_dummy = TRUE,
-    remove_selected_columns = TRUE
-  )
+cancelled_orders <- df_joined %>%
+  filter(is_cancelled == 1 &
+           pickup_date - cancellation_date <= 1) %>%
+  mutate(mon = month(pickup_date)) %>%
+  group_by(mon) %>%
+  summarise(cancelled = n()) %>%
+  ungroup()
 
-cv_ridge <- cv.glmnet(
-  x = as.matrix(train[names(train) != "target"]),
-  y = train[["target"]],
-  nfolds = 10,
-  standardize = TRUE,
-  alpha = 0
-)
+rush_cancellations <- rented_cars %>%
+  left_join(cancelled_orders, by = "mon") %>%
+  mutate(rush_ratio = cancelled / (rented + cancelled)) %>%
+  select(mon, rush_ratio)
 
+temp_drop_days <- tibble(drop = ifelse(diff(city_weather$avg_temp, 2) / na.omit(lag(
+  city_weather$avg_temp, 2
+)) < 0, 1, 0),
+date = city_weather$date[3:nrow(city_weather)])
 
+model_data_alt <- model_data %>%
+  inner_join(temp_drop_days, by = c("pickup_date" = "date")) %>%
+  mutate(drop = ifelse(drop == 1,
+                       rush_cancellations$rush_ratio[match(month(pickup_date), rush_cancellations$mon)],
+                       0))
 
-cv_ridge$glmnet.fit$dev.ratio[which(cv_ridge$glmnet.fit$lambda == cv_ridge$lambda.min)]
+write_csv(model_data_alt, "derived/model_data_alt.csv")
 
-rf_mod
+rmse_rf_model_alt_data <- get_cv_rmse_rf_model(model_data_alt)
+rmse_ridge_model_alt_data <- get_cv_rmse_ridge_model(model_data_alt)
 
-sqrt(rf_mod$mse[length(rf_mod$mse)])
-
-varImpPlot(rf_mod, type = 2)
-
-
-
-# create hyperparameter grid
+#gbm tuning
+#create hyperparameter grid
 hyper_grid <- expand.grid(
-  shrinkage = c(.3, .5, .7),
+  shrinkage = c(.1, .3, .5),
   interaction.depth = c(3, 5, 7),
   n.minobsinnode = c(5, 10, 15),
   bag.fraction = c(.5, .6, .8),
   optimal_trees = 0,
-  # a place to dump results
-  min_RMSE = 0                     # a place to dump results
+  min_RMSE = 0
 )
 
-# grid search
+#grid search
 for (i in 1:nrow(hyper_grid)) {
-  # reproducibility
-  set.seed(1234)
+  set.seed(1)
   
-  # train model
-  gbm.tune <- gbm(
+  gbm_tune <- gbm(
     formula = target ~ .,
     distribution = "gaussian",
-    data = model_data[, -3],
-    n.trees = 5000,
+    data = model_data %>% select(-pickup_date),
+    n.trees = 1000,
     interaction.depth = hyper_grid$interaction.depth[i],
     shrinkage = hyper_grid$shrinkage[i],
     n.minobsinnode = hyper_grid$n.minobsinnode[i],
     bag.fraction = hyper_grid$bag.fraction[i],
     train.fraction = .75,
     n.cores = NULL,
-    # will use all cores by default
     verbose = FALSE
   )
   
-  # add min training error and trees to grid
-  hyper_grid$optimal_trees[i] <- which.min(gbm.tune$valid.error)
-  hyper_grid$min_RMSE[i] <- sqrt(min(gbm.tune$valid.error))
+  hyper_grid$optimal_trees[i] <- which.min(gbm_tune$valid.error)
+  hyper_grid$min_RMSE[i] <- sqrt(min(gbm_tune$valid.error))
 }
 
-gbm_tune <- gbm(
-  formula = target ~ .,
-  distribution = "gaussian",
-  data = train_data,
-  n.trees = 5,
-  interaction.depth = 3,
-  shrinkage = 0.7,
-  n.minobsinnode = 5,
-  bag.fraction = 0.6,
-  train.fraction = .75,
-  n.cores = NULL,
-  # will use all cores by default
-  verbose = FALSE
-)
-
-preds_gbm <- predict(gbm_tune, test_data[, -1])
-
-rmse2
-sqrt(mean((preds_gbm - test_data$target) ^ 2))
-testData2$gbm <- preds_gbm
-testData2$rf <- preds
-
 hyper_grid %>%
-  dplyr::arrange(min_RMSE) %>%
+  arrange(min_RMSE) %>%
   head(10)
-library(gbm)
 
-data(mtcars)
-Rf_model <- randomForest(mpg ~ ., data = mtcars)
+get_cv_rmse_gbm_model <- function(data,
+                                  k = 10,
+                                  seed = 1) {
+  set.seed(seed)
+  
+  data <- data %>%
+    select(-pickup_date)
+  
+  data <- data[sample(nrow(data)),]
+  folds <- cut(seq(1, nrow(data)), breaks = k, labels = FALSE)
+  rmse <- c()
+  
+  for (i in 1:k) {
+    indices <- which(folds == i, arr.ind = TRUE)
+    test_data <- data[indices,]
+    train_data <- data[-indices,]
+    
+    gbm_best <- gbm(
+      formula = target ~ .,
+      distribution = "gaussian",
+      data = train_data,
+      n.trees = 10,
+      interaction.depth = 3,
+      shrinkage = .5,
+      n.minobsinnode = 15,
+      bag.fraction = .5,
+      train.fraction = .75,
+      n.cores = NULL,
+      verbose = FALSE
+    )
+    
+    predicts <- predict(gbm_best, test_data[, -1])
+    
+    rmse[i] <- sqrt(mean((predicts - test_data$target) ^ 2))
+  }
+  mean(rmse)
+}
 
-rf_pred <- predict(Rf_model, mtcars) # predictions
-
-Rf_model
-
-sqrt(mean((rf_pred - mtcars$mpg) ^ 2)) #RMSE
-sqrt(tail(f$mse, 1))
-
-sqrt(mean((Rf_model$predicted - mtcars$mpg) ^ 2))
+rmse_gbm_model <- get_cv_rmse_gbm_model(model_data)
+rmse_gbm_model_alt_data <- get_cv_rmse_gbm_model(model_data_alt)
