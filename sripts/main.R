@@ -5,6 +5,7 @@ library(randomForest)
 library(glmnet)
 library(fastDummies)
 library(gbm)
+library(xgboost)
 
 
 
@@ -310,10 +311,11 @@ rush_cancellations <- rented_cars %>%
   mutate(rush_ratio = cancelled / (rented + cancelled)) %>%
   select(mon, rush_ratio)
 
-temp_drop_days <- tibble(drop = ifelse(diff(city_weather$avg_temp, 2) / na.omit(lag(
-  city_weather$avg_temp, 2
-)) < 0, 1, 0),
-date = city_weather$date[3:nrow(city_weather)])
+temp_drop_days <-
+  tibble(drop = ifelse(diff(city_weather$avg_temp, 2) / na.omit(lag(
+    city_weather$avg_temp, 2
+  )) < 0, 1, 0),
+  date = city_weather$date[3:nrow(city_weather)])
 
 model_data_alt <- model_data %>%
   inner_join(temp_drop_days, by = c("pickup_date" = "date")) %>%
@@ -403,3 +405,134 @@ get_cv_rmse_gbm_model <- function(data,
 
 rmse_gbm_model <- get_cv_rmse_gbm_model(model_data)
 rmse_gbm_model_alt_data <- get_cv_rmse_gbm_model(model_data_alt)
+
+#xgboost
+#create hyperparameter grid
+hyper_grid_xgb <- expand.grid(
+  eta = c(.01, .05, .1, .3),
+  max_depth = c(1, 3, 5, 7),
+  min_child_weight = c(1, 3, 5, 7),
+  subsample = c(.6, .8, 1),
+  colsample_bytree = c(.8, .9, 1),
+  optimal_trees = 0,
+  min_RMSE = 0
+)
+
+xgb_data <- model_data %>%
+  select(-pickup_date) %>%
+  dummy_cols(
+    select_columns = c("company_name"),
+    remove_first_dummy = TRUE,
+    remove_selected_columns = TRUE
+  )
+
+#grid search
+for (i in 1:nrow(hyper_grid_xgb)) {
+  #create parameter list
+  params <- list(
+    eta = hyper_grid_xgb$eta[i],
+    max_depth = hyper_grid_xgb$max_depth[i],
+    min_child_weight = hyper_grid_xgb$min_child_weight[i],
+    subsample = hyper_grid_xgb$subsample[i],
+    colsample_bytree = hyper_grid_xgb$colsample_bytree[i]
+  )
+  
+  set.seed(1)
+  
+  #train model
+  xgb_tune <- xgb.cv(
+    params = params,
+    data = as.matrix(xgb_data[names(xgb_data) != "target"]),
+    label = xgb_data[["target"]],
+    nrounds = 1000,
+    nfold = 5,
+    objective = "reg:linear",
+    verbose = 0,
+    early_stopping_rounds = 10 #stop if no improvement for 10 consecutive trees
+  )
+  
+  hyper_grid_xgb$optimal_trees[i] <-
+    which.min(xgb_tune$evaluation_log$test_rmse_mean)
+  hyper_grid_xgb$min_RMSE[i] <-
+    min(xgb_tune$evaluation_log$test_rmse_mean)
+}
+
+hyper_grid_xgb %>%
+  arrange(min_RMSE) %>%
+  head(10)
+
+
+get_cv_rmse_xgb_model <- function(data,
+                                  k = 10,
+                                  seed = 1) {
+  set.seed(seed)
+  
+  data <- data %>%
+    select(-pickup_date) %>%
+    dummy_cols(
+      select_columns = c("company_name"),
+      remove_first_dummy = TRUE,
+      remove_selected_columns = TRUE
+    )
+  
+  data <- data[sample(nrow(data)),]
+  folds <- cut(seq(1, nrow(data)), breaks = k, labels = FALSE)
+  
+  params_final <- list(
+    eta = 0.01,
+    max_depth = 3,
+    min_child_weight = 1,
+    subsample = 0.6,
+    colsample_bytree = 1
+  )
+  
+  rmse <- c()
+  
+  for (i in 1:k) {
+    indices <- which(folds == i, arr.ind = TRUE)
+    test_data <- data[indices,]
+    train_data <- data[-indices,]
+    
+    xgb_mod <- xgboost(
+      params = params_final,
+      data = as.matrix(train_data[names(train_data) != "target"]),
+      label = train_data[["target"]],
+      nrounds = 365,
+      objective = "reg:linear",
+      verbose = 0
+    )
+    
+    predicts <-
+      predict(xgb_mod,
+              as.matrix(test_data[, -1]))
+    
+    rmse[i] <- sqrt(mean((predicts - test_data$target) ^ 2))
+  }
+  mean(rmse)
+}
+
+rmse_xgb_model <- get_cv_rmse_xgb_model(model_data)
+rmse_xgb_model_alt_data <- get_cv_rmse_xgb_model(model_data_alt)
+
+#parameter list
+params_final <- list(
+  eta = 0.01,
+  max_depth = 3,
+  min_child_weight = 1,
+  subsample = 0.6,
+  colsample_bytree = 1
+)
+
+
+#train final model
+xgb_fit_final <- xgboost(
+  params = params_final,
+  data = as.matrix(xgb_data[names(xgb_data) != "target"]),
+  label = xgb_data[["target"]],
+  nrounds = 365,
+  objective = "reg:linear",
+  verbose = 0
+)
+
+saveRDS(params_final, "results/models/xgb_param.rds")
+saveRDS(xgb_fit_final, "results/models/xgb_model.rds")
