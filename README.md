@@ -34,11 +34,14 @@ RMSE on 10-fold cross-validation is used to compare models to each other as well
 
 # Results
 by RMSE on 10-fold CV on model_data / model_data_alt(incl. weather feature) set:
-**2.03** / 2.08 - xgb
-2.04 / **2.07** - ridge regression
-2.06 / 2.12 - gbm
-2.09 / 2.15 - rf
-2.15 / ---- - mean by mon_dow
+1. **2.03** / 2.08 - xgb
+2. 2.04 / **2.07** - ridge regression
+3. 2.06 / 2.12 - gbm
+4. 2.09 / 2.15 - rf
+5. 2.15 / ---- - mean by mon_dow
+(somewhat different for *holomb_test.ipynb*)
+
+Predictions are available at [results/predictions](https://github.com/woldemarg/lightit_test/tree/master/results/predictions) folder, while scripts (incl .ipynb) are in [scripts](https://github.com/woldemarg/lightit_test/tree/master/sripts) folder.
 
 # What to be improved
 1. Get a schedule of flights available for forecasting
