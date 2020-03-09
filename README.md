@@ -33,7 +33,7 @@ RMSE on 10-fold cross-validation is used to compare models to each other as well
 4. *drop* - in a fashion a hysteresis experimental feature to asses the impact of change in weather conditions on a rental statistic. The logic of introducing this feature is as follows: since the rental act is a matter of aforehand planning numerous facts of cancelling orders in a day (or even at the same day) as the pickup day may be caused by unexpected changes in external circumstances such as but not limited to weather conditions. *drop* denotes average (per comparable month) ratio of "rush cancellations" to the total number of orders for a given day if it keeps track of temperature dropdown for the previous day. Introducing this feature showed no improvement on the model and resulted in the reduction of train dataset, thus was used in an alternative dataset for modelling, stored at [derived](https://github.com/woldemarg/lightit_test/tree/master/derived) folder
 
 # Results
-by RMSE on 10-fold CV on model_data / model_data_alt(incl. weather feature) set:
+by RMSE on 10-fold CV on model_data / model_data_alt (incl. weather feature) set:
 1. **2.03** / 2.08 - xgb
 2. 2.04 / **2.07** - ridge regression
 3. 2.06 / 2.12 - gbm
