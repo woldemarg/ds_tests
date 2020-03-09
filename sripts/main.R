@@ -1,14 +1,14 @@
 library(tidyverse)
-library(lubridate)
-library(geosphere)
+library(lubridate)    #parse dates
+library(geosphere)    #calculate distance to event location
 library(randomForest)
 library(glmnet)
-library(fastDummies)
+library(fastDummies)  #one-hot-encoding for ridge and xgb
 library(gbm)
 library(xgboost)
 
 
-
+#all files were previously encoded to utf-8
 description <- read_csv("data/encoded/columns_description.csv")
 events <- read_csv("data/encoded/events_Hokkaido.csv")
 holidays <- read_csv("data/encoded/holidays_Japan.csv")
@@ -19,7 +19,9 @@ weather <- read_csv("data/encoded/weather_Hokkaido.csv")
 names(rakuten) <- description$`Row(EN)`[1:48]
 names(jalan) <- description$`Row(EN)`[49:94]
 
-#parsing dates
+
+
+#parsing dates in all input data
 get_date <- function(timestamp, format = "Y/m/d H:M") {
   return(date(parse_date_time(timestamp, format)))
 }
@@ -38,7 +40,7 @@ weather <- weather %>%
 
 
 
-#detect identical columns within datasets
+#identical columns within main datasets
 jalan_filtered <- jalan %>%
   mutate(
     company_name = "jalan",
@@ -88,19 +90,23 @@ rakuten_filtered <- rakuten %>%
     request_date,
     cancellation_date,
     is_cancelled,
-    #num_of_passengers,
-    #num_of_children,
-    #arrival_flight,
-    #total_price
+    #num_of_passengers, #leave these cols for further predicting improvement
+    #num_of_children,   #though not available for predicting might be useful
+    #arrival_flight,    #for some feature engineering, such as assesing
+    #total_price        #promotional offers etc
   )
-
 
 df_joined <- bind_rows(jalan_filtered, rakuten_filtered)
 #df_joined$arrival_flight[df_joined$arrival_flight == "0"] <- NA
 
+
+
 write_csv(df_joined, "derived/df_joined.csv")
 
-#preparing data
+
+
+#preparing data in such a way to get a row with a
+#target value for each company per each given date
 model_data <- df_joined %>%
   filter(is_cancelled == 0) %>%
   group_by(pickup_date, company_name) %>%
@@ -117,8 +123,10 @@ model_data$pickup_date <- as_date(model_data$pickup_date)
 model_data$company_name <- as_factor(model_data$company_name)
 
 
-ggplot(data = model_data, aes(x = pickup_date, y = target)) +
+
+ggplot(data = model_data, aes(x = pickup_date, y = target, color = company_name)) +
   geom_bar(stat = "identity")
+
 
 
 #simple average approach
@@ -132,14 +140,14 @@ get_cv_rmse_mean_model <- function(data,
            mon = month(pickup_date)) %>%
     select(-pickup_date)
   
-  data <- data[sample(nrow(data)),]
+  data <- data[sample(nrow(data)), ]
   folds <- cut(seq(1, nrow(data)), breaks = k, labels = FALSE)
   rmse <- c()
   
   for (i in 1:k) {
     indices <- which(folds == i, arr.ind = TRUE)
-    test_data <- data[indices,]
-    train_data <- data[-indices,]
+    test_data <- data[indices, ]
+    train_data <- data[-indices, ]
     
     mean_model <- train_data %>%
       group_by(company_name, dow, mon) %>%
@@ -160,6 +168,7 @@ get_cv_rmse_mean_model <- function(data,
 rmse_mean_model <- get_cv_rmse_mean_model(model_data, seed = 1)
 
 
+
 #some feature engineering
 model_data <- model_data %>%
   mutate(mon_dow = paste(month(pickup_date, label = TRUE),
@@ -170,10 +179,12 @@ mon_dow_lookup <- model_data %>%
   group_by(mon_dow) %>%
   summarise(mon_dow_encoded = mean(target))
 
-#target encoding
+#target encoding for date
 model_data <-
   left_join(model_data, mon_dow_lookup, by = "mon_dow") %>%
   select(-mon_dow)
+
+
 
 #start of long weekend (first day of two or more holidays in a row)
 holidays <- holidays %>%
@@ -185,9 +196,10 @@ holidays <- holidays %>%
     0
   ))
 
-
 model_data <- model_data %>%
   mutate(is_start_long_we = holidays$start_long_we[match(pickup_date, holidays$day)])
+
+
 
 #upcoming events
 avg_rent_duration <-
@@ -209,7 +221,11 @@ get_events <- function(pickup_day) {
 
 model_data$events <- sapply(model_data$pickup_date, get_events)
 
+
+
 write_csv(model_data, "derived/model_data.csv")
+
+
 
 #modelling
 get_cv_rmse_rf_model <- function(data,
@@ -220,17 +236,17 @@ get_cv_rmse_rf_model <- function(data,
   data <- data %>%
     select(-pickup_date)
   
-  data <- data[sample(nrow(data)),]
+  data <- data[sample(nrow(data)), ]
   folds <- cut(seq(1, nrow(data)), breaks = k, labels = FALSE)
   rmse <- c()
   
   for (i in 1:k) {
     indices <- which(folds == i, arr.ind = TRUE)
-    test_data <- data[indices,]
-    train_data <- data[-indices,]
+    test_data <- data[indices, ]
+    train_data <- data[-indices, ]
     
     rf_mod = randomForest(target ~ . , data = train_data)
-    predicts <- predict(rf_mod, test_data[, -1])
+    predicts <- predict(rf_mod, test_data[,-1])
     
     rmse[i] <- sqrt(mean((predicts - test_data$target) ^ 2))
   }
@@ -250,14 +266,14 @@ get_cv_rmse_ridge_model <- function(data,
       remove_selected_columns = TRUE
     )
   
-  data <- data[sample(nrow(data)),]
+  data <- data[sample(nrow(data)), ]
   folds <- cut(seq(1, nrow(data)), breaks = k, labels = FALSE)
   rmse <- c()
   
   for (i in 1:k) {
     indices <- which(folds == i, arr.ind = TRUE)
-    test_data <- data[indices,]
-    train_data <- data[-indices,]
+    test_data <- data[indices, ]
+    train_data <- data[-indices, ]
     
     cv_ridge <- cv.glmnet(
       x = as.matrix(train_data[names(train_data) != "target"]),
@@ -270,7 +286,7 @@ get_cv_rmse_ridge_model <- function(data,
     predicts <-
       predict(cv_ridge,
               s = cv_ridge$lambda.min,
-              newx = as.matrix(test_data[, -1]))
+              newx = as.matrix(test_data[,-1]))
     
     rmse[i] <- sqrt(mean((predicts - test_data$target) ^ 2))
   }
@@ -278,6 +294,7 @@ get_cv_rmse_ridge_model <- function(data,
 }
 
 rmse_rf_model <- get_cv_rmse_rf_model(model_data)
+
 rmse_ridge_model <- get_cv_rmse_ridge_model(model_data)
 
 
@@ -289,7 +306,6 @@ city_weather <- weather %>% filter(city_id == 1536) %>%
   select(date, avg_temp) %>%
   complete(date = seq(date[1], as_date("2019-02-28"), by = "1 day")) %>%
   fill(avg_temp)
-
 
 rented_cars <- df_joined %>%
   filter(is_cancelled == 0) %>%
@@ -323,13 +339,19 @@ model_data_alt <- model_data %>%
                        rush_cancellations$rush_ratio[match(month(pickup_date), rush_cancellations$mon)],
                        0))
 
+
+
 write_csv(model_data_alt, "derived/model_data_alt.csv")
 
+
+
 rmse_rf_model_alt_data <- get_cv_rmse_rf_model(model_data_alt)
+
 rmse_ridge_model_alt_data <- get_cv_rmse_ridge_model(model_data_alt)
 
-#gbm tuning
-#create hyperparameter grid
+
+
+#gbm tuning via hyperparameter grid
 hyper_grid <- expand.grid(
   shrinkage = c(.1, .3, .5),
   interaction.depth = c(3, 5, 7),
@@ -365,6 +387,7 @@ hyper_grid %>%
   arrange(min_RMSE) %>%
   head(10)
 
+
 get_cv_rmse_gbm_model <- function(data,
                                   k = 10,
                                   seed = 1) {
@@ -373,14 +396,14 @@ get_cv_rmse_gbm_model <- function(data,
   data <- data %>%
     select(-pickup_date)
   
-  data <- data[sample(nrow(data)),]
+  data <- data[sample(nrow(data)), ]
   folds <- cut(seq(1, nrow(data)), breaks = k, labels = FALSE)
   rmse <- c()
   
   for (i in 1:k) {
     indices <- which(folds == i, arr.ind = TRUE)
-    test_data <- data[indices,]
-    train_data <- data[-indices,]
+    test_data <- data[indices, ]
+    train_data <- data[-indices, ]
     
     gbm_best <- gbm(
       formula = target ~ .,
@@ -396,7 +419,7 @@ get_cv_rmse_gbm_model <- function(data,
       verbose = FALSE
     )
     
-    predicts <- predict(gbm_best, test_data[, -1])
+    predicts <- predict(gbm_best, test_data[,-1])
     
     rmse[i] <- sqrt(mean((predicts - test_data$target) ^ 2))
   }
@@ -404,10 +427,12 @@ get_cv_rmse_gbm_model <- function(data,
 }
 
 rmse_gbm_model <- get_cv_rmse_gbm_model(model_data)
+
 rmse_gbm_model_alt_data <- get_cv_rmse_gbm_model(model_data_alt)
 
-#xgboost
-#create hyperparameter grid
+
+
+#tuning xgboost via hyperparameter grid
 hyper_grid_xgb <- expand.grid(
   eta = c(.01, .05, .1, .3),
   max_depth = c(1, 3, 5, 7),
@@ -418,6 +443,7 @@ hyper_grid_xgb <- expand.grid(
   min_RMSE = 0
 )
 
+
 xgb_data <- model_data %>%
   select(-pickup_date) %>%
   dummy_cols(
@@ -426,9 +452,9 @@ xgb_data <- model_data %>%
     remove_selected_columns = TRUE
   )
 
+
 #grid search
 for (i in 1:nrow(hyper_grid_xgb)) {
-  #create parameter list
   params <- list(
     eta = hyper_grid_xgb$eta[i],
     max_depth = hyper_grid_xgb$max_depth[i],
@@ -439,16 +465,15 @@ for (i in 1:nrow(hyper_grid_xgb)) {
   
   set.seed(1)
   
-  #train model
   xgb_tune <- xgb.cv(
     params = params,
     data = as.matrix(xgb_data[names(xgb_data) != "target"]),
     label = xgb_data[["target"]],
     nrounds = 1000,
     nfold = 5,
-    objective = "reg:linear",
+    objective = "reg:squarederror",
     verbose = 0,
-    early_stopping_rounds = 10 #stop if no improvement for 10 consecutive trees
+    early_stopping_rounds = 10  #stop if no improvement for 10 consecutive trees
   )
   
   hyper_grid_xgb$optimal_trees[i] <-
@@ -475,7 +500,7 @@ get_cv_rmse_xgb_model <- function(data,
       remove_selected_columns = TRUE
     )
   
-  data <- data[sample(nrow(data)),]
+  data <- data[sample(nrow(data)), ]
   folds <- cut(seq(1, nrow(data)), breaks = k, labels = FALSE)
   
   params_final <- list(
@@ -490,29 +515,32 @@ get_cv_rmse_xgb_model <- function(data,
   
   for (i in 1:k) {
     indices <- which(folds == i, arr.ind = TRUE)
-    test_data <- data[indices,]
-    train_data <- data[-indices,]
+    test_data <- data[indices, ]
+    train_data <- data[-indices, ]
     
     xgb_mod <- xgboost(
       params = params_final,
       data = as.matrix(train_data[names(train_data) != "target"]),
       label = train_data[["target"]],
       nrounds = 365,
-      objective = "reg:linear",
+      objective = "reg:squarederror",
       verbose = 0
     )
     
     predicts <-
       predict(xgb_mod,
-              as.matrix(test_data[, -1]))
+              as.matrix(test_data[,-1]))
     
     rmse[i] <- sqrt(mean((predicts - test_data$target) ^ 2))
   }
   mean(rmse)
 }
 
+
 rmse_xgb_model <- get_cv_rmse_xgb_model(model_data)
+
 rmse_xgb_model_alt_data <- get_cv_rmse_xgb_model(model_data_alt)
+
 
 #parameter list
 params_final <- list(
@@ -523,16 +551,108 @@ params_final <- list(
   colsample_bytree = 1
 )
 
-
-#train final model
+#train final model for xgb
 xgb_fit_final <- xgboost(
   params = params_final,
   data = as.matrix(xgb_data[names(xgb_data) != "target"]),
   label = xgb_data[["target"]],
   nrounds = 365,
-  objective = "reg:linear",
+  objective = "reg:squarederror",
   verbose = 0
+)
+
+
+#train final model for ridge on model_data_alt
+ridge_data_alt <- model_data_alt %>%
+  select(-pickup_date) %>%
+  dummy_cols(
+    select_columns = c("company_name"),
+    remove_first_dummy = TRUE,
+    remove_selected_columns = TRUE
+  )
+
+ridge_fit_final_alt <- cv.glmnet(
+  x = as.matrix(ridge_data_alt[names(ridge_data_alt) != "target"]),
+  y = ridge_data_alt[["target"]],
+  nfolds = 10,
+  standardize = TRUE,
+  alpha = 0
 )
 
 saveRDS(params_final, "results/models/xgb_param.rds")
 saveRDS(xgb_fit_final, "results/models/xgb_model.rds")
+saveRDS(ridge_fit_final_alt, "results/models/ridge_model_alt.rds")
+
+
+
+#features importance
+importance_matrix <- xgb.importance(model = xgb_fit_final)
+xgb.plot.importance(importance_matrix, measure = "Gain")
+
+rf_mod_alt <-
+  randomForest(target ~ . , data = model_data_alt %>% select(-pickup_date))
+varImpPlot(rf_mod_alt)
+
+
+#new data for Jan-Feb 2019
+new_data <- tibble(date = rep(seq(
+  as_date("2019-01-01"), as_date("2019-02-28"), by = "1 day"
+), each = 2),
+company_name = rep(c("rakuten", "jalan"), length(date) / 2)) %>%
+  mutate(
+    mon_dow = paste(month(date, label = TRUE),
+                    as.character(wday(date, label = TRUE)),
+                    sep = "_"),
+    mon_dow_encoded = mon_dow_lookup$mon_dow_encoded[match(mon_dow, mon_dow_lookup$mon_dow)],
+    is_start_long_we = holidays$start_long_we[match(date, holidays$day)],
+    events = sapply(date, get_events),
+    is_drop_temp = temp_drop_days$drop[match(date, temp_drop_days$date)],
+    drop = ifelse(is_drop_temp == 1,
+                  rush_cancellations$rush_ratio[match(month(date), rush_cancellations$mon)],
+                  0)
+  ) %>%
+  dummy_cols(
+    select_columns = c("company_name"),
+    remove_first_dummy = TRUE,
+    remove_selected_columns = TRUE
+  ) %>%
+  select(-mon_dow,-is_drop_temp)
+
+
+
+#make final predictions
+xgb_new_data_preds <-
+  predict(xgb_fit_final,
+          as.matrix(new_data[,-c(1, 5)]))
+
+ridge_new_data_preds_alt <-
+  c(predict(
+    ridge_fit_final_alt,
+    s = ridge_fit_final_alt$lambda.min,
+    newx = as.matrix(new_data[,-1])
+  ))
+
+
+#saving results
+results <-
+  cbind(new_data[, c(1, 6)], xgb_new_data_preds, ridge_new_data_preds_alt)  %>%
+  mutate(
+    xgb_rounded = round(xgb_new_data_preds, 0),
+    ridge_rounded = round(ridge_new_data_preds_alt, 0)
+  )
+
+results_jalan <- subset(results, company_name_jalan == 1)
+results_rakuten <- subset(results, company_name_jalan == 0)
+
+
+write_csv(results_rakuten[, c(1, 3)], "results/predictions/rakuten_xgb_raw.csv")
+write_csv(results_rakuten[, c(1, 5)],
+          "results/predictions/rakuten_xgb_rounded.csv")
+write_csv(results_rakuten[, c(1, 4)], "results/predictions/rakuten_alt_raw.csv")
+write_csv(results_rakuten[, c(1, 6)],
+          "results/predictions/rakuten_alt_rounded.csv")
+
+write_csv(results_jalan[, c(1, 3)], "results/predictions/jalan_xgb_raw.csv")
+write_csv(results_jalan[, c(1, 5)], "results/predictions/jalan_xgb_rounded.csv")
+write_csv(results_jalan[, c(1, 4)], "results/predictions/jalan_alt_raw.csv")
+write_csv(results_jalan[, c(1, 6)], "results/predictions/jalan_alt_rounded.csv")
