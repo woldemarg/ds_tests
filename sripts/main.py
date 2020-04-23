@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
 
 
 description = pd.read_csv("data/encoded/columns_description.csv", index_col=0)
@@ -49,8 +50,7 @@ rakuten = (rakuten
 
 
 def extract_date(row):
-    """Get date from all date_time
-    columns in a given row."""
+    """Get date from all date_time columns in a given row."""
     row.iloc[1:-1] = row.iloc[1:-1].dt.date
     return row
 
@@ -90,34 +90,64 @@ model_data = (pd.concat([model_data, days_wo_rakuten, days_wo_jalan], axis=0)
 # model_data.to_csv("derived/model_data_py.csv", index=False)
 
 
+timeline_raw = pd.pivot_table(model_data,
+                              values="target",
+                              index=["pickup_date"],
+                              columns=["company_name"])
 
-date_index = pd.date_range(model_data["pickup_date"].min(),
-                           model_data["pickup_date"].max(),
-                           freq="D")
+dates_index = pd.date_range(min(timeline_raw.index),
+                            max(timeline_raw.index),
+                            freq="D")
 
-missed_in_data = (pd.Series(index[~index.isin(model_data["pickup_date"])])
-                   .repeat(2))
+timeline_days = timeline_raw.reindex(dates_index, fill_value=0)
 
-z = np.repeat(["a", "b"], 3)
-np.repeat(3, 4)
-
-series = pd.Series(range(9), index=index)
-
-model_data["pickup_date"] = pd.to_datetime(model_data["pickup_date"])
-
-
-df_weeks = (model_data
-             .groupby(
-                 [model_data.pickup_date.dt.strftime('%Y-w%V'),
-                 "company_name"])
-             .sum()
-             .reset_index())
+timeline_weeks = (timeline_days
+                  .groupby(pd.PeriodIndex(timeline_days.index, freq="W"))
+                  .sum())
 
 
-df_weeks_pivoted = pd.pivot_table(df_weeks,
-                                  values="target",
-                                  index=["pickup_date"],
-                                  columns=["company_name"])
+# =============================================================================
+# timeline_weeks = (timeline_days
+#                   .groupby([model_data.pickup_date.dt.strftime('%Y-w%V'),
+#                             "company_name"])
+#              .sum()
+#              .reset_index())
+# =============================================================================
 
 
-df_weeks_pivoted.plot()
+def apply_polynomial(X, y, d):
+    poly = np.poly1d(np.polyfit(X, y, d))
+    rmse = np.sqrt(((poly(X) - y) ** 2).mean())
+    return poly, rmse
+
+
+def remove_seasonality(series):
+    weeks = series.index.week
+    degree = 2
+    model, rmse = apply_polynomial(weeks, series, degree)
+
+    while True:
+        degree += 1
+        new_model, new_rmse = apply_polynomial(weeks, series, degree)
+        if rmse - new_rmse < 0.5:
+            best_model, best_rmse = new_model, new_rmse
+            break
+        rmse = new_rmse
+
+    s_component = best_model(weeks)
+    a_series = np.subtract(series.reset_index(drop=True), s_component)
+
+    return s_component, a_series
+
+
+for i, series in enumerate(["jalan", "rakuten"], 1):
+    s_component, a_series = remove_seasonality(timeline_weeks[series])
+    plt.subplot(1,2,i)
+    plt.plot(timeline_weeks[series].reset_index(drop=True))
+    plt.plot(s_component, color="red")
+    plt.title(series)
+    plt.ylim(0, 70)
+
+
+rakuten_seasonality, rakuten_adjusted = remove_seasonality(timeline_weeks.rakuten)
+jalan_seasonality, jalan_adjusted = remove_seasonality(timeline_weeks.jalan)
