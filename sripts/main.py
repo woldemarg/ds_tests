@@ -87,6 +87,22 @@ model_data = (pd.concat([model_data, days_wo_rakuten, days_wo_jalan], axis=0)
               .sort_values(by=["pickup_date", "company_name"]))
 
 
+# model_data.to_csv("derived/model_data_py.csv", index=False)
+
+
+
+date_index = pd.date_range(model_data["pickup_date"].min(),
+                           model_data["pickup_date"].max(),
+                           freq="D")
+
+missed_in_data = (pd.Series(index[~index.isin(model_data["pickup_date"])])
+                   .repeat(2))
+
+z = np.repeat(["a", "b"], 3)
+np.repeat(3, 4)
+
+series = pd.Series(range(9), index=index)
+
 model_data["pickup_date"] = pd.to_datetime(model_data["pickup_date"])
 
 
