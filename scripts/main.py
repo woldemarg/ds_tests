@@ -111,7 +111,7 @@ model_data_full = (pd.concat([model_data,
 
 # %%
 
-model_data = model_data_full[model_data_full.pickup_date < pd.Timestamp(2019,1,1)]
+model_data = model_data_full[model_data_full.pickup_date < pd.Timestamp(2019, 1, 1)]
 
 # model_data.to_csv("derived/model_data_py.csv", index=False)
 
@@ -132,27 +132,26 @@ timeline_weeks = (timeline_days
                   .sum())
 
 # %%
-def apply_polynomial(y, d):
+def apply_polynomial(comp, d):
     poly = np.poly1d(np.polyfit(range(1, 53),
-                                y.groupby(y.index.week).mean(), d))
-    rmse = np.sqrt(((poly(y.index.week) - y) ** 2).mean())
+                                comp.groupby(comp.index.week).mean(), d))
+    rmse = np.sqrt(((poly(comp.index.week) - comp) ** 2).mean())
     return poly, rmse
 
 
 def remove_seasonality(series):
-    weeks = series.index.week
     degree = 2
-    model, rmse = apply_polynomial(series, degree)
+    poly, rmse = apply_polynomial(series, degree)
 
     while True:
         degree += 1
-        new_model, new_rmse = apply_polynomial(series, degree)
+        new_poly, new_rmse = apply_polynomial(series, degree)
         if rmse - new_rmse < 0.5:
-            best_model, best_rmse = new_model, new_rmse
+            best_poly, best_rmse = new_poly, new_rmse
             break
         rmse = new_rmse
 
-    s_component = best_model(series.index.week)
+    s_component = best_poly(series.index.week)
     a_series = np.subtract(series.reset_index(drop=True), s_component)
 
     return s_component, a_series
@@ -160,10 +159,10 @@ def remove_seasonality(series):
 plt.figure()
 
 for i, s in enumerate(["jalan", "rakuten"], 1):
-    s_component, a_series = remove_seasonality(timeline_weeks[s])
+    seasonality, adjusted = remove_seasonality(timeline_weeks[s])
     plt.subplot(1, 2, i)
     plt.plot(timeline_weeks[s].reset_index(drop=True))
-    plt.plot(s_component, color="red")
+    plt.plot(seasonality, color="red")
     plt.ylim(0, 70)
     plt.title(s)
 
@@ -182,8 +181,8 @@ plt.show()
 # %%
 def get_outliers(*series):
     out = []
-    for s in series:
-        zscores = list(np.abs(stats.zscore(s)))
+    for ser in series:
+        zscores = list(np.abs(stats.zscore(ser)))
         indicies = [i for i, v in enumerate(zscores) if v >= 2.5]
         out.append(indicies)
 
@@ -215,14 +214,14 @@ def is_holidays_series(row):
         row.Japan == 1 and
         row.Japan_next == 1):
         return 1
-    elif (row.wday == "Fri" and
+    if (row.wday == "Fri" and
           row.Japan == 1):
         return 1
-    elif (row.wday == "Sat" and
+    if (row.wday == "Sat" and
           row.Japan_next_next == 1):
         return 1
-    else:
-        return 0
+
+    return 0
 
 
 holidays_mod = (holidays
@@ -231,9 +230,9 @@ holidays_mod = (holidays
                 .assign(Japan_next_next=holidays.Japan.shift(-2))
                 .assign(wday=holidays.day.apply(lambda d: d.strftime("%a"))))
 
-holidays["is_holidays_series"] = holidays_mod.apply(is_holidays_series,
+holidays.loc[:, "is_holidays_series"] = holidays_mod.apply(is_holidays_series,
                                                     axis=1)
-holidays["day"] = holidays.day.dt.date
+holidays.loc[:, "day"] = holidays.day.dt.date
 
 model_data = (model_data
               .merge(holidays,
@@ -241,6 +240,7 @@ model_data = (model_data
                      left_on="pickup_date",
                      right_on="day")
               .drop(["day", "Japan", "year_week"], axis=1))
+
 # %%
 train = (model_data
          .assign(month=model_data.pickup_date.apply(lambda d: d.strftime("%b")))
@@ -310,7 +310,7 @@ rf_default = model_RF.fit(OH_X, y)
 
 
 feat_importances = pd.Series(rf_default.feature_importances_,
-                             index = OH_X.columns)
+                             index=OH_X.columns)
 
 
 plt.figure()
@@ -350,8 +350,7 @@ train_sizes = [1, 250, 500, 750, 1000, 1250, 1443]
 
 def compare_learning_curves(predictors,
                             target,
-                            train_sizes,
-                            cv):
+                            train_sizes):
     train_sizes, train_scores, validation_scores = learning_curve(
         model_RF,
         predictors,
@@ -377,7 +376,7 @@ def compare_learning_curves(predictors,
 plt.figure()
 for i, data in enumerate([OH_X, OH_X_alt], 1):
     plt.subplot(1, 2, i)
-    compare_learning_curves(data, y, train_sizes, 5)
+    compare_learning_curves(data, y, train_sizes)
 
 # %%
 # Number of trees in random forest
@@ -451,15 +450,15 @@ pipe_data = (model_data
              .set_index("pickup_date"))
 
 
-def assign_month(X):
+def assign_month(x_data):
     get_month = lambda i: i.strftime("%b")
-    return X.assign(month=X.index.map(get_month))
+    return x_data.assign(month=x_data.index.map(get_month))
 
 
-def assign_weekend(X):
+def assign_weekend(x_data):
     get_wday_name = lambda i: i.strftime("%a")
-    return X.assign(is_weekend=[1 if get_wday_name(i) in (["Sat", "Sun"])
-                                else 0 for i in X.index])
+    return x_data.assign(is_weekend=[1 if get_wday_name(i) in (["Sat", "Sun"])
+                                else 0 for i in x_data.index])
 
 date_parser = Pipeline(steps=[
     ("get_month", FunctionTransformer(assign_month)),
@@ -491,8 +490,8 @@ msg = "RF_best: %f (%f)" % (scores_best.mean(), scores_best.std())
 print(msg)
 
 # %%
-test_data = model_data_full[(model_data_full.pickup_date >= pd.Timestamp(2019,1,1)) &
-                            (model_data_full.pickup_date < pd.Timestamp(2019,3,1))]
+test_data = model_data_full[(model_data_full.pickup_date >= pd.Timestamp(2019, 1,1)) &
+                            (model_data_full.pickup_date < pd.Timestamp(2019, 3, 1))]
 
 X_test = (test_data
           .merge(holidays,
