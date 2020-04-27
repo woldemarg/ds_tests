@@ -22,6 +22,8 @@ from sklearn.preprocessing import FunctionTransformer
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
 
+from sklearn.metrics import mean_squared_error
+
 # %%
 description = pd.read_csv("https://raw.githubusercontent.com/woldemarg/lightit_test/master/data/encoded/columns_description.csv", index_col=0)
 description.reset_index(drop=True, inplace=True)
@@ -205,7 +207,7 @@ format_to_year_week_2 = lambda d: "_".join([str(d.isocalendar()[0]),
 model_data.loc[:, "year_week"] = (model_data.pickup_date
                                   .apply(format_to_year_week_2))
 
-model_data = model_data.loc[~model_data.year_week.isin(out_weeks)]
+model_data = model_data.loc[~model_data.year_week.isin(out_weeks), :]
 
 # %%
 def is_holidays_series(row):
@@ -422,16 +424,16 @@ print(rf_random.best_params_)
 # %%
 # Create the parameter grid based on the results of random search
 param_grid = {
-    "bootstrap": [False],
-    "max_depth": [5, 10, 15],
-    "max_features": [3, 5, 7],
+    "bootstrap": [True],
+    "max_depth": [70, 90, 110],
+    "max_features": [4, 5],
     "min_samples_leaf": [3, 4, 5],
-    "min_samples_split": [3, 5, 10],
-    "n_estimators": [1500, 2000, 2500]
+    "min_samples_split": [8, 10, 12],
+    "n_estimators": [1000, 1600]
 }
 
 # Instantiate the grid search model
-grid_search = GridSearchCV(estimator=model_RF,
+grid_search = GridSearchCV(estimator=RandomForestRegressor(),
                            param_grid=param_grid,
                            cv=3,
                            verbose=2,
@@ -439,22 +441,10 @@ grid_search = GridSearchCV(estimator=model_RF,
 
 grid_search.fit(OH_X_alt, y)
 
-grid_search.best_params_
+best_grid_rf = grid_search.best_estimator_
 
-scores_tuned = -1 * cross_val_score(RandomForestRegressor(
-    n_estimators=2000,
-    min_samples_split=5,
-    min_samples_leaf=4,
-    max_features=4,
-    max_depth=10,
-    bootstrap=False,
-    random_state=1234),
-                             OH_X_alt,
-                             y,
-                             scoring=scoring)
+print(grid_search.best_params_)
 
-msg = "RF_alt_tuned: %f (%f)" % (scores_tuned.mean(), scores_tuned.std())
-print(msg)
 # %%
 pipe_data = (model_data
              .drop(["target"], axis=1)
@@ -481,40 +471,41 @@ col_processor = ColumnTransformer(
     transformers=[
         ("one_hot",
          OneHotEncoder(handle_unknown="ignore"),
-         ["company_name", "month", "is_weekend"])
+         ["company_name", "month"])
         ]
     )
 
-
-# =============================================================================
-# final_model = RandomForestRegressor(n_estimators=2000,
-#                                     min_samples_split=5,
-#                                     min_samples_leaf=4,
-#                                     max_features=4,
-#                                     max_depth=10,
-#                                     bootstrap=False,
-#                                     random_state=1234)
-# =============================================================================
 
 # Bundle preprocessing and modeling code in a pipeline
 model_pipeline = Pipeline(steps=[
     ("parse_date", date_parser),
     ("pre_process", col_processor),
-    ("build_model", model_RF)])
+    ("build_model", best_grid_rf)])
 
 
-#model_pipeline.fit(pipe_data, y)
-
-# predict target values on the training data
-#model_pipeline.predict(train_x)
-
-scores_tuned_3 = -1 * cross_val_score(model_pipeline,
-                             pipe_data,
-                             y,
-                             scoring=scoring)
-msg = "RF_alt: %f (%f)" % (scores_tuned_3.mean(), scores_tuned_3.std())
+scores_best = -1 * cross_val_score(model_pipeline,
+                                   pipe_data,
+                                   y,
+                                   scoring=scoring)
+msg = "RF_best: %f (%f)" % (scores_best.mean(), scores_best.std())
 print(msg)
+
 # %%
-february = pd.date_range("2019-01-01min(timeline_raw.index),
-                            max(timeline_raw.index),
-                            freq="D")
+test_data = model_data_full[(model_data_full.pickup_date >= pd.Timestamp(2019,1,1)) &
+                            (model_data_full.pickup_date < pd.Timestamp(2019,3,1))]
+
+X_test = (test_data
+          .merge(holidays,
+                 how="left",
+                 left_on="pickup_date",
+                 right_on="day")
+          .drop(["day", "Japan", "target"], axis=1)
+          .set_index("pickup_date"))
+
+y_test = test_data.target
+
+model_pipeline.fit(pipe_data, y)
+
+msg = "RMSE on test: %f" % (mean_squared_error(y_test,
+                                               model_pipeline.predict(X_test))**0.5)
+print(msg)
