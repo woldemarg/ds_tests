@@ -57,7 +57,7 @@ FROM      (
                                                                              WHERE  `date` BETWEEN '2020-02-17' AND    '2020-02-21' 
                                                                              AND    `type` = 
                                                                                     CASE 
-                                                                                           WHEN `date` < '2020-02-21' THEN 'spent' 
+                                                                                           WHEN `date` < '2020-02-20' THEN 'spent' 
                                                                                            ELSE 'estimated'
                                                                                     end) t1 
                                                             LEFT JOIN `public.worker` 
