@@ -12,9 +12,13 @@ from sklearn.metrics import calinski_harabasz_score
 
 from sklearn.decomposition import PCA
 
+from sklearn.ensemble import RandomForestClassifier
+
 # %%
 url = "https://raw.githubusercontent.com/woldemarg/nix_solutions_test/master/task_3/data/Data%20for%20the%20Churn%20task%20_%20BDA%20homework.csv"
 data = pd.read_csv(url)
+
+data.head()
 
 # %%
 data.isnull().sum()
@@ -69,6 +73,8 @@ OH_cols.columns = OH_cols_names
 data_num = pd.concat([data_mod.drop(cat_cols_left, axis=1), OH_cols],
                      axis=1)
 
+data_num.head()
+
 # %%
 y = data_num.Churn
 X = data_num.drop(["Churn"], axis=1)
@@ -98,32 +104,34 @@ for k in num_clusters:
 
     k_means_res.update({k: k_means.__dict__})
 
+# %%
 fig, ax1 = plt.subplots()
 
 color = "tab:red"
 ax1.set_xlabel("num of clusters")
-ax1.set_ylabel("CH score", color=color)
+ax1.set_ylabel("CH scores", color=color)
 ax1.plot(num_clusters, ch_scores, color=color)
 ax1.tick_params(axis='y', labelcolor=color)
 ax1.axvline(x=4, linestyle="--", color="tab:grey", linewidth=0.75)
 ax2 = ax1.twinx()
 
 color = 'tab:blue'
-ax2.set_ylabel("silhouette score", color=color)
+ax2.set_ylabel("silhouette scores", color=color)
 ax2.plot(num_clusters, sl_scores, color=color)
 ax2.tick_params(axis='y', labelcolor=color)
 
 fig.tight_layout()
+plt.title("Potential number of clusters")
 plt.show()
 
+# %%
 k_best = 4
 
-# %%
 pca = PCA(n_components=2)
 
 principal_components = pca.fit_transform(X_scaled)
 
-principal_df = pd.DataFrame(data = principalComponents,
+principal_df = pd.DataFrame(data = principal_components,
                             columns = ["PC_1", "PC_2"])
 
 data_pca = pd.concat([principal_df,
@@ -146,16 +154,130 @@ data_pca.plot.scatter(x="PC_1",
                       alpha=0.5)
 
 # %%
+data_clusters = pd.concat([X, data_pca.cluster_labels], axis=1)
+
+internet = (data_clusters
+            .groupby(["cluster_labels", "InternetService"])
+            .agg({"InternetService": "count"})
+            .unstack(level=-1, fill_value=0))
+
+internet
+
+# %%
+i_services = data_clusters.iloc[:, [7, 8, 9, 10, 11, 12, 21]]
+
+i_services_share = (i_services
+                    .groupby("cluster_labels")
+                    .apply(lambda df: df.sum() / df.count() * 100)
+                    .drop("cluster_labels", axis=1))
+
+def draw_heatmap(d, x_ticks, y_ticks, title, x_label=None, y_label=None):
+    fig_hm, ax = plt.subplots()
+    hm = plt.pcolor(d)
+    ax.set_xticks(np.arange(d.shape[1]) + 0.5)
+    ax.set_yticks(np.arange(d.shape[0]) + 0.5)
+    ax.set_xticklabels(x_ticks)
+    ax.set_yticklabels(y_ticks)
+    ax.set_xlabel(x_label)
+    ax.set_ylabel(y_label)
+    plt.setp(ax.get_xticklabels(),
+             rotation=45,
+             ha="right",
+             rotation_mode="anchor")
+    for i in range(d.shape[0]):
+        for j in range(d.shape[1]):
+            plt.text(j + 0.5, i + 0.5, '%.1f' % data.iloc[i, j],
+                     horizontalalignment='center',
+                     verticalalignment='center')
+    plt.colorbar(hm)
+    fig_hm.tight_layout()
+    ax.set_title(title)
+    plt.show()
+
+draw_heatmap(i_services_share,
+             i_services_share.columns,
+             range(4),
+             "% of users by received Internet services per cluster")
+
+# %%
+mon_income = (data_clusters
+              .groupby("cluster_labels")["MonthlyCharges"].sum()
+              .apply(lambda x:
+                     x / data_clusters["MonthlyCharges"].sum() * 100))
+mon_income
+
+# %%
+mon_income_avg = (data_clusters
+                  .groupby("cluster_labels")["MonthlyCharges"].mean())
+
+mon_income_avg
+
+# %%
 churn_per_cluster = (data_pca
                      .groupby(["cluster_labels", "Churn"])
                      .agg({"Churn": "count"}))
 
-cluster_size = data_pca.groupby("cluster_labels").count()
+churn_per_cluster["ratio"] = (churn_per_cluster
+                              .groupby(level=0)
+                              .apply(lambda x:
+                                     100 * x / x.sum()))
 
-churn_ratio = (churn_per_cluster
-               .div(cluster_size, level="cluster_labels")
-               .loc[:, "Churn"]
-               .rename("ratio")
-               .reset_index()
-               .query("Churn == 1"))
+# %%
+rf_mod = RandomForestClassifier(class_weight="balanced_subsample")
 
+rf_mod_churn = rf_mod.fit(X, y)
+
+f_imp_churn = pd.Series(rf_mod_churn.feature_importances_,
+                        index=X.columns)
+
+plt.figure()
+f_imp_churn.nlargest(5).plot(kind="barh")
+plt.show()
+
+# %%
+rf_mod_clusters = rf_mod.fit(X, data_pca["cluster_labels"])
+
+f_imp_clusters = pd.Series(rf_mod_clusters.feature_importances_,
+                            index=X.columns)
+
+plt.figure()
+f_imp_clusters.nlargest(5).plot(kind="barh")
+plt.show()
+
+# %%
+data_clusters["MonthlyCharges_desc"] = pd.cut(data_clusters.MonthlyCharges,
+                                              bins=5,
+                                              right=False)
+
+data_clusters["tenure_desc"] = pd.cut(data_clusters.tenure,
+                                      bins=5,
+                                      right=False)
+
+data_clusters_churn = pd.concat([data_clusters, y], axis=1)
+
+task_cluster = (data_clusters_churn
+                .loc[data_clusters.cluster_labels == churn_per_cluster
+                     .unstack(level=1)["ratio"][1]
+                     .idxmax(), :])
+
+cluster_grouped = (task_cluster
+                     .groupby(["MonthlyCharges_desc",
+                               "tenure_desc",
+                               "Churn"])
+                     .agg({"Churn": "count"})
+                     .unstack(level=2))
+
+def get_churn_ratio(row):
+    row["ratio"] = row[1] / row.sum() * 100 if row[1] != 0 else 0
+    return row
+
+cluster_churn_ratio = (cluster_grouped
+                       .apply(get_churn_ratio, axis=1)["ratio"]
+                       .unstack(level=1))
+
+draw_heatmap(cluster_churn_ratio,
+             cluster_churn_ratio.columns,
+             cluster_churn_ratio.index,
+             "Churn in given cluster per tenure and charge ranges",
+             "tenure ranges",
+             "monthly charge ranges")
