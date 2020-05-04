@@ -47,16 +47,16 @@ threesome_cols = (data_mod.columns[(data_mod.nunique() == 3) &
 
 data_mod.loc[:, threesome_cols] = (data_mod[threesome_cols]
                                    .replace({
-                                       "Yes":1,
-                                       "No":0,
-                                       "No phone service":0,
-                                       "No internet service":0}))
+                                       "Yes": 1,
+                                       "No": 0,
+                                       "No phone service": 0,
+                                       "No internet service": 0}))
 
 data_mod.loc[:, "InternetService"] = (data_mod.InternetService
                                       .replace({
-                                          "No":0,
-                                          "DSL":1,
-                                          "Fiber optic":2}))
+                                          "No": 0,
+                                          "DSL": 1,
+                                          "Fiber optic": 2}))
 
 # %%
 cat_cols_left = [col for col in data_mod
@@ -78,13 +78,13 @@ data_num.head()
 # %%
 (data_num[(data_num.PhoneService == 0) &
          (data_num.InternetService != 0)]["MonthlyCharges"]
-         .agg(["min", "mean", "max"]))
+ .agg(["min", "mean", "max"]))
 
 # %%
 (data[(data.PhoneService == "No") &
-         (data_num.InternetService != "No")]
+         (data.InternetService != "No")]
  .groupby("PaymentMethod")["MonthlyCharges"]
-         .agg(["min", "mean", "max", "count"]))
+ .agg(["min", "mean", "max", "count"]))
 
 # %%
 (data_num
@@ -94,16 +94,16 @@ data_num.head()
 # %%
 (data[data.Churn == "Yes"]
  .groupby("Contract")["Churn"]
-         .count())
+ .count())
 
 # %%
-(data.
-assign(tenure_bins=pd.cut(data["tenure"],
-                          [0, 10, 30, 50, 72],
-                          include_lowest=True,
-                          precision=0))
-.groupby("tenure_bins")["MonthlyCharges"]
-.sum() / data["MonthlyCharges"].sum() *100)
+(data
+ .assign(tenure_bins=pd.cut(data["tenure"],
+                            [0, 10, 30, 50, 72],
+                            include_lowest=True,
+                            precision=0))
+ .groupby("tenure_bins")["MonthlyCharges"]
+ .sum() / data["MonthlyCharges"].sum() *100)
 
 # %%
 y = data_num.Churn
@@ -122,12 +122,13 @@ k_means_res = {}
 
 num_clusters = range(2, 11)
 
+
 for k in num_clusters:
     k_means = KMeans(n_clusters=k).fit(X_scaled)
 
     sl_scores.append(silhouette_score(X_scaled,
                                       k_means.labels_,
-                                      metric = 'euclidean'))
+                                      metric='euclidean'))
 
     ch_scores.append(calinski_harabasz_score(X_scaled,
                                              k_means.labels_))
@@ -161,8 +162,8 @@ pca = PCA(n_components=2)
 
 principal_components = pca.fit_transform(X_scaled)
 
-principal_df = pd.DataFrame(data = principal_components,
-                            columns = ["PC_1", "PC_2"])
+principal_df = pd.DataFrame(data=principal_components,
+                            columns=["PC_1", "PC_2"])
 
 data_pca = pd.concat([principal_df,
                       pd.Series(k_means_res[k_best]["labels_"],
@@ -201,6 +202,7 @@ i_services_share = (i_services
                     .apply(lambda df: df.sum() / df.count() * 100)
                     .drop("cluster_labels", axis=1))
 
+
 def draw_heatmap(d, x_ticks, y_ticks, title, x_label=None, y_label=None):
     fig_hm, ax = plt.subplots()
     hm = plt.pcolor(d)
@@ -223,6 +225,7 @@ def draw_heatmap(d, x_ticks, y_ticks, title, x_label=None, y_label=None):
     fig_hm.tight_layout()
     ax.set_title(title)
     plt.show()
+
 
 draw_heatmap(i_services_share,
              i_services_share.columns,
@@ -260,6 +263,7 @@ rf_mod_churn = rf_mod.fit(X, y)
 f_imp_churn = pd.Series(rf_mod_churn.feature_importances_,
                         index=X.columns)
 
+
 plt.figure()
 f_imp_churn.nlargest(5).plot(kind="barh")
 plt.show()
@@ -268,7 +272,8 @@ plt.show()
 rf_mod_clusters = rf_mod.fit(X, data_pca["cluster_labels"])
 
 f_imp_clusters = pd.Series(rf_mod_clusters.feature_importances_,
-                            index=X.columns)
+                           /index=X.columns)
+
 
 plt.figure()
 f_imp_clusters.nlargest(5).plot(kind="barh")
@@ -291,15 +296,17 @@ task_cluster = (data_clusters_churn
                      .idxmax(), :])
 
 cluster_grouped = (task_cluster
-                     .groupby(["MonthlyCharges_desc",
+                   .groupby(["MonthlyCharges_desc",
                                "tenure_desc",
                                "Churn"])
-                     .agg({"Churn": "count"})
-                     .unstack(level=2))
+                    .agg({"Churn": "count"})
+                    .unstack(level=2))
+
 
 def get_churn_ratio(row):
     row["ratio"] = row[1] / row.sum() * 100 if row[1] != 0 else 0
     return row
+
 
 cluster_churn_ratio = (cluster_grouped
                        .apply(get_churn_ratio, axis=1)["ratio"]
