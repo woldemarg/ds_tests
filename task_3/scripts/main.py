@@ -76,6 +76,36 @@ data_num = pd.concat([data_mod.drop(cat_cols_left, axis=1), OH_cols],
 data_num.head()
 
 # %%
+(data_num[(data_num.PhoneService == 0) &
+         (data_num.InternetService != 0)]["MonthlyCharges"]
+         .agg(["min", "mean", "max"]))
+
+# %%
+(data[(data.PhoneService == "No") &
+         (data_num.InternetService != "No")]
+ .groupby("PaymentMethod")["MonthlyCharges"]
+         .agg(["min", "mean", "max", "count"]))
+
+# %%
+(data_num
+ .groupby("Churn")["MonthlyCharges"]
+ .sum() / data_num["MonthlyCharges"].sum() * 100)
+
+# %%
+(data[data.Churn == "Yes"]
+ .groupby("Contract")["Churn"]
+         .count())
+
+# %%
+(data.
+assign(tenure_bins=pd.cut(data["tenure"],
+                          [0, 10, 30, 50, 72],
+                          include_lowest=True,
+                          precision=0))
+.groupby("tenure_bins")["MonthlyCharges"]
+.sum() / data["MonthlyCharges"].sum() *100)
+
+# %%
 y = data_num.Churn
 X = data_num.drop(["Churn"], axis=1)
 
@@ -186,7 +216,7 @@ def draw_heatmap(d, x_ticks, y_ticks, title, x_label=None, y_label=None):
              rotation_mode="anchor")
     for i in range(d.shape[0]):
         for j in range(d.shape[1]):
-            plt.text(j + 0.5, i + 0.5, '%.1f' % data.iloc[i, j],
+            plt.text(j + 0.5, i + 0.5, '%.1f' % d.iloc[i, j],
                      horizontalalignment='center',
                      verticalalignment='center')
     plt.colorbar(hm)
@@ -245,13 +275,13 @@ f_imp_clusters.nlargest(5).plot(kind="barh")
 plt.show()
 
 # %%
-data_clusters["MonthlyCharges_desc"] = pd.cut(data_clusters.MonthlyCharges,
-                                              bins=5,
-                                              right=False)
+data_clusters["MonthlyCharges_desc"] = pd.qcut(data_clusters.MonthlyCharges,
+                                              q=5,
+                                              precision=0)
 
-data_clusters["tenure_desc"] = pd.cut(data_clusters.tenure,
-                                      bins=5,
-                                      right=False)
+data_clusters["tenure_desc"] = pd.qcut(data_clusters.tenure,
+                                      q=5,
+                                      precision=0)
 
 data_clusters_churn = pd.concat([data_clusters, y], axis=1)
 
@@ -278,6 +308,6 @@ cluster_churn_ratio = (cluster_grouped
 draw_heatmap(cluster_churn_ratio,
              cluster_churn_ratio.columns,
              cluster_churn_ratio.index,
-             "Churn in given cluster per tenure and charge ranges",
-             "tenure ranges",
-             "monthly charge ranges")
+             "Churn rate in a given cluster per tenure and charge",
+             "tenure range (months)",
+             "monthly charge range (USD)")
