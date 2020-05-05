@@ -272,7 +272,7 @@ plt.show()
 rf_mod_clusters = rf_mod.fit(X, data_pca["cluster_labels"])
 
 f_imp_clusters = pd.Series(rf_mod_clusters.feature_importances_,
-                           /index=X.columns)
+                           index=X.columns)
 
 
 plt.figure()
