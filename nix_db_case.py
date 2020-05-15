@@ -137,3 +137,70 @@ FROM
       WHERE FIRST_NAME = 'NIKOLA'
         AND LAST_NAME = 'TESLA') t3 ON t3.start_date <= dates.year_month);
         """, con)
+
+# %% [markdown]
+# f. Напишите запрос, который выведет накопленную зарплату по месяцам, разбитую по позициям, за 2014 год
+
+# %%
+pd.read_sql_query("""
+WITH RECURSIVE dates AS
+  (SELECT '2014-01' AS year_month
+   UNION ALL SELECT strftime('%Y-%m', date(year_month||'-01', '+1 month'))
+   FROM dates
+   WHERE year_month < date('2014-12-01', '-1 month'))
+SELECT POSITION,
+       SUM(CASE
+               WHEN year_month = '2014-01' THEN CUM_SALARY
+           END) AS '2014-01',
+       SUM(CASE
+               WHEN year_month = '2014-02' THEN CUM_SALARY
+           END) AS '2014-02',
+       SUM(CASE
+               WHEN year_month = '2014-03' THEN CUM_SALARY
+           END) AS '2014-03',
+       SUM(CASE
+               WHEN year_month = '2014-04' THEN CUM_SALARY
+           END) AS '2014-04',
+       SUM(CASE
+               WHEN year_month = '2014-05' THEN CUM_SALARY
+           END) AS '2014-05',
+       SUM(CASE
+               WHEN year_month = '2014-06' THEN CUM_SALARY
+           END) AS '2014-06',
+       SUM(CASE
+               WHEN year_month = '2014-07' THEN CUM_SALARY
+           END) AS '2014-07',
+       SUM(CASE
+               WHEN year_month = '2014-08' THEN CUM_SALARY
+           END) AS '2014-08',
+       SUM(CASE
+               WHEN year_month = '2014-09' THEN CUM_SALARY
+           END) AS '2014-09',
+       SUM(CASE
+               WHEN year_month = '2014-10' THEN CUM_SALARY
+           END) AS '2014-10',
+       SUM(CASE
+               WHEN year_month = '2014-11' THEN CUM_SALARY
+           END) AS '2014-11',
+       SUM(CASE
+               WHEN year_month = '2014-12' THEN CUM_SALARY
+           END) AS '2014-12'
+FROM
+  (SELECT year_month,
+          POSITION,
+          SUM(SUM_SALARY) OVER (PARTITION BY POSITION
+                                ORDER BY year_month) AS CUM_SALARY
+   FROM
+     (SELECT year_month,
+             POSITION,
+             SUM_SALARY
+      FROM dates
+      INNER JOIN
+        (SELECT POSITION,
+                SUM(SALARY) AS SUM_SALARY,
+                '2014-01' AS mon
+         FROM job
+         GROUP BY POSITION) t1 ON dates.year_month >= t1.mon))
+GROUP BY POSITION;
+      """, con)
+      
