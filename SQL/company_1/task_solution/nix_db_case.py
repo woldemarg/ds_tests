@@ -1,7 +1,6 @@
-# To add a new cell, type '# %%'
-# To add a new markdown cell, type '# %% [markdown]'
 # %%
 import sqlite3
+import numpy as np
 import pandas as pd
 
 # %% [markdown]
@@ -13,17 +12,17 @@ cur = con.cursor()
 
 
 # %%
-sql_dump = open(r"db_sql\db_dmp.sql","r")
+sql_dump = open(r"db_sql\db_dmp.sql", "r")
 sql_statements = (sql_dump
-                    .read()
-                    .split(";"))
+                  .read()
+                  .split(";"))
 sql_dump.close()
-                
+
 for st in sql_statements:
     try:
         cur.execute(st)
     except sqlite3.Error as e:
-        print(e)              
+        print(e)
 
 # %% [markdown]
 # ## Check DB (get list of tables)
@@ -34,7 +33,7 @@ pd.read_sql_query(
         FROM sqlite_master 
         WHERE type ='table'
         AND name NOT LIKE 'sqlite_%'; """,
-        con)
+    con)
 
 # %% [markdown]
 # ## Run queries in SQL
@@ -45,7 +44,7 @@ pd.read_sql_query(
     """ SELECT DISTINCT(POSITION)
         FROM job
         WHERE SALARY BETWEEN 400 AND 600; """,
-        con)
+    con)
 
 # %% [markdown]
 # b. Напишите запрос, который выполняет вывод списка офисов, расположенных в SEBEWAING и ELECTRON, количество рабочих и средней зарплаты рабочих в каждом офисе
@@ -56,7 +55,7 @@ pd.read_sql_query(
         FROM job
         WHERE OFFICE_CITY IN ("SEBEWAING", "ELECTRON")
         GROUP BY OFFICE; """,
-        con)
+    con)
 
 # %% [markdown]
 # c. Напишите запрос, который выводит название профессий (без повторений), все представители которой получают зарплату в промежутке 400-700
@@ -69,7 +68,7 @@ pd.read_sql_query(
             (SELECT POSITION
             FROM job
             WHERE SALARY NOT BETWEEN 400 AND 700); """,
-        con)
+    con)
 
 # %% [markdown]
 # d. Напишите запрос, который выводит среднюю зарплату работников, которые старше 30 лет, группируя по полу и возрасту, но при выводе увеличивающий данные о величине зарплаты на 20%
@@ -84,7 +83,7 @@ pd.read_sql_query(
         ON t1.WORKER_ID = t2.WORKER_ID
         WHERE AGE > 30
         GROUP BY AGE, GENDER; """,
-        con)
+    con)
 
 # %% [markdown]
 # e. Напишите запрос, который выведет накопленную зарплату по месяцам для Николы Теслы начиная с его приему на работу до сегодняшнего дня.
@@ -203,4 +202,101 @@ FROM
          GROUP BY POSITION) t1 ON dates.year_month >= t1.mon))
 GROUP BY POSITION;
       """, con)
-      
+
+# %% [markdown]
+# ## Same queries in pandas
+
+# %%
+job = pd.read_sql_query("SELECT * FROM job", con)
+workers = pd.read_sql_query("SELECT * FROM workers", con)
+con.close()
+
+# %% [markdown]
+# task A
+
+# %%
+job.loc[(job["SALARY"] >= 400) & (job["SALARY"] <= 600), "POSITION"].unique()
+
+# %% [markdown]
+# task B
+
+# %%
+(job[job["OFFICE_CITY"].isin(["SEBEWAING", "ELECTRON"])]
+ .groupby("OFFICE")
+ .agg({"WORKER_ID": "count", "SALARY": "mean"}))
+
+# %% [markdown]
+# task C
+
+# %%
+(job
+ .groupby("POSITION")
+ .filter(lambda g: all((g["SALARY"] <= 700) & (g["SALARY"] >= 400)))["POSITION"]
+ .unique())
+
+# %% [markdown]
+# task D
+
+# %%
+workers_new = (workers
+               .assign(AGE=(pd.to_datetime("today") -
+                            pd.to_datetime(workers["DOB"], format="%d-%b-%y")) //
+                       np.timedelta64(1, "Y")))
+
+workers_merged = pd.merge(workers_new, job, on="WORKER_ID")
+
+(workers_merged
+ .query("AGE > 30")
+ .groupby(["GENDER", "AGE"])
+ .agg(SALARY=pd.NamedAgg(column="SALARY", aggfunc=(lambda x: np.mean(x) * 1.2))))
+
+# %% [markdown]
+# task E
+
+# %%
+d_range = (pd.Series(pd.date_range(start=min(pd.to_datetime(job["FROM_DATE"],
+                                                            format="%d-%b-%y")),
+                                   end=pd.to_datetime("2020-06-01"),
+                                   freq="M"))
+           .to_frame(name="range")
+           .set_index("range"))
+
+
+job_filtered = (job
+                .loc[job["WORKER_ID"] == workers
+                     .loc[(workers["FIRST_NAME"] == "NIKOLA") &
+                          (workers["LAST_NAME"] == "TESLA"), "WORKER_ID"]
+                     .values[0],
+                     ["SALARY", "FROM_DATE"]]
+                .assign(FROM_DATE=pd.to_datetime(job["FROM_DATE"],
+                                                 format="%d-%b-%y"))
+                .set_index("FROM_DATE"))
+
+
+(pd.merge_asof(d_range,
+               job_filtered,
+               left_index=True,
+               right_index=True)
+ .dropna(axis=0)
+ .cumsum())
+
+# %% [markdown]
+# task F
+
+# %%
+m_index = (pd.MultiIndex
+             .from_product([sorted(list(job["POSITION"]
+                                        .unique())),
+                            list(pd.date_range(start=pd.to_datetime("2014-01-01"),
+                                               end=pd.to_datetime(
+                                "2014-12-31"),
+                                freq="M").strftime("%Y-%m"))]))
+s_array = (job
+           .groupby("POSITION")["SALARY"]
+           .sum()
+           .repeat(12)
+           .to_numpy())
+
+(pd.Series(s_array, index=m_index)
+ .unstack(level=-1)
+ .cumsum(axis=1))
