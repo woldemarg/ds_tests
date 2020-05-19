@@ -12,7 +12,7 @@ cur = con.cursor()
 
 
 # %%
-sql_dump = open(r"db_sql\db_dmp.sql", "r")
+sql_dump = open(r"D:\py_ml\ds_tests\SQL\company_1\task_solution\db_sql", "r")
 sql_statements = (sql_dump
                   .read()
                   .split(";"))
@@ -30,7 +30,7 @@ for st in sql_statements:
 # %%
 pd.read_sql_query(
     """ SELECT name
-        FROM sqlite_master 
+        FROM sqlite_master
         WHERE type ='table'
         AND name NOT LIKE 'sqlite_%'; """,
     con)
