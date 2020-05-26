@@ -1,13 +1,3 @@
-<<<<<<< HEAD
-## Volodymyr Holomb
-##### test assignment for business data analyst 
-
-
-### Contents:
-* [task 1](https://github.com/woldemarg/nix_solutions_test/tree/master/task_1)
-* [task 2](https://github.com/woldemarg/nix_solutions_test/tree/master/task_2)
-* [task 3](https://github.com/woldemarg/nix_solutions_test/tree/master/task_3)
-
 ### Notes:
 Task 1 should not be considered as completely fulfilled as it seems somewhat excessively comprehensive for a test assignment. As such I've prioritised my time with task 3.
 =======
@@ -18,7 +8,7 @@ Task 1 should not be considered as completely fulfilled as it seems somewhat exc
 All given files were initially encoded to utf_8 in Notepad++ and stored as input data at [encoded](https://github.com/woldemarg/lightit_test/tree/master/data/encoded) folder.
 
 # Model assumptions
-My initial assumptions regarding the task were as follows: 
+My initial assumptions regarding the task were as follows:
 1. Citizens rent a car to get to/out of the airport
 2. Citizens rent a car to get to events in another city (i.e. locations outside *Chintose*)
 3. Rental frequency might depend on the day of week and month
@@ -34,7 +24,7 @@ My initial assumptions regarding the task were as follows:
 1. Ridge regression
 2. Random forest
 3. Gradient boosted machines
-4. Extreme gradient boosting 
+4. Extreme gradient boosting
 
 # Comparative metrics
 RMSE on 10-fold cross-validation is used to compare models to each other as well as to  "simple mean" approach (predicting future orders based on month and day-of-week average per each company)
