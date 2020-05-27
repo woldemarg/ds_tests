@@ -10,7 +10,7 @@ sample = (pd.read_csv("D:/py_ml/ds_tests/machine_learning/company_3/task_solutio
           .drop(["id"], axis=1))
 
 y_sample = sample["gb"]
-X_sample = sample.drop(["gb"], axis=1)
+X_sample = sample.copy()
 
 # %%
 from sklearn.model_selection import train_test_split
@@ -82,19 +82,19 @@ X_train, X_test = X_train.align(X_test,
 
 # %%
 cols_low_std = (X_train
-                .columns[X_train.std() < th_low_variance]
+                .columns[(X_train.std() < th_low_variance) &
+                         (X_train.columns != "gb")]
                 .tolist())
 
 # %%
-cols_low_corr = (X_train.join(y_train)
-                .columns[(X_train.join(y_train)
-                         .corr().abs()["gb"] < th_corr) &
-                         (X_train.join(y_train)
-                          .columns != "gb")]
+cols_low_corr = (X_train
+                .columns[(X_train.corr().abs()["gb"] < th_corr) &
+                         (X_train.columns != "gb")]
                 .tolist())
 
 # %%
 cols_to_drop_final = list(set(cols_low_std) | set(cols_low_corr))
+cols_to_drop_final.append("gb")
 
 # %%
 X_train = X_train.drop(cols_to_drop_final, axis=1)
@@ -102,7 +102,6 @@ X_test = X_test.drop(cols_to_drop_final, axis=1)
 
 # %%
 target = y_train.value_counts()
-
 spw = target[0] / target[1]
 
 xgb_model = XGBClassifier(random_state=1234,
