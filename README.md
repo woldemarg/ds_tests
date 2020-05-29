@@ -1,5 +1,5 @@
 ## Volodymyr Holomb
-#### data scientist applicant / [full CV](https://github.com/woldemarg/ds_tests)
+#### data scientist applicant / [full CV](https://docs.google.com/document/d/1i_rOz6NEZY_XRS3ZF626_kdPI960sQKZ6fGE0D9XCRo/edit?usp=sharing)
 
 
 
