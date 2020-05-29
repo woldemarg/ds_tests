@@ -1,20 +1,21 @@
 # %%
 import numpy as np
 import pandas as pd
+import joblib
 
 from xgboost import XGBClassifier
 from sklearn.metrics import roc_auc_score
+from sklearn.metrics import confusion_matrix
+from sklearn.model_selection import train_test_split
 
 # %%
-sample = (pd.read_csv("D:/py_ml/ds_tests/machine_learning/company_3/task_solution/derived/sample.csv")
+sample = (pd.read_csv("machine_learning/company_3/task_solution/derived/sample.csv")
           .drop(["id"], axis=1))
 
 y_sample = sample["gb"]
 X_sample = sample.copy()
 
 # %%
-from sklearn.model_selection import train_test_split
-
 X_train, X_test, y_train, y_test = train_test_split(X_sample,
                                                     y_sample,
                                                     test_size=0.2,
@@ -69,7 +70,8 @@ X_test.loc[:, nums_left] = (X_test[nums_left]
                              .fillna(X_train[nums_left].mean()))
 
 # %%
-print(X_train.isna().sum().sum()); print(X_test.isna().sum().sum())
+print(X_train.isna().sum().sum())
+print(X_test.isna().sum().sum())
 
 # %%
 X_train = pd.get_dummies(X_train)
@@ -105,10 +107,17 @@ target = y_train.value_counts()
 spw = target[0] / target[1]
 
 xgb_model = XGBClassifier(random_state=1234,
-                          objective="reg:squarederror",
-                          scale_pos_weight=spw)
+                          objective="binary:logistic",
+                          scale_pos_weight=spw,
+                          n_jobs=-1)
 
 xgb_model.fit(X_train, y_train)
 
-print("ROC_AUC on test: {}".format(roc_auc_score(y_test,
-                                                 xgb_model.predict(X_test))))
+y_pred = xgb_model.predict(X_test)
+
+print("ROC-AUC on test: {}".format(roc_auc_score(y_test, y_pred)))
+print("Confusion matrix:")
+print(confusion_matrix(y_test, y_pred))
+
+# %%
+joblib.dump(xgb_model, "machine_learning/company_3/task_solution/derived/base_model.sav")
