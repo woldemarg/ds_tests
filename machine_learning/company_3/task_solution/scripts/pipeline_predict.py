@@ -46,3 +46,6 @@ model_pipe.fit(X_train, y_train)
 delay_pred = (delay_df
               .assign(gb=model_pipe.
                       predict_proba(X_delay)[:, 1]))
+# %%
+delay_pred.to_csv("machine_learning/company_3/task_solution/results/delay_df.csv",
+                    index=True)

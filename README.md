@@ -1,5 +1,5 @@
 ## Volodymyr Holomb
-#### data science job applicant / [full CV](https://github.com/woldemarg/ds_tests)
+#### data scientist applicant / [full CV](https://github.com/woldemarg/ds_tests)
 
 
 
@@ -18,3 +18,5 @@
 ### Machine learning assignments
 1. Company 2
 * [description](https://github.com/woldemarg/ds_tests/tree/master/machine_learning/company_2/task_description) / [solution](https://github.com/woldemarg/ds_tests/tree/master/machine_learning/company_2/task_solution) (modelling in R, alternative modelling in Python)
+2. Company 3
+* [description](https://github.com/woldemarg/ds_tests/tree/master/machine_learning/company_3/task_description) / [solution](https://github.com/woldemarg/ds_tests/tree/master/machine_learning/company_3/task_solution) (model pipeline and custom transformers)
