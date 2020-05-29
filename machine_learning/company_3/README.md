@@ -17,7 +17,7 @@
 ### 5. Predicting with *best*parameters in a pipeline: [notebook](https://github.com/woldemarg/ds_tests/blob/master/machine_learning/company_3/task_solution/scripts/notebooks/pipeline_predict.ipynb)
 
 ## Results:
-* model desc:   XGBClassifier, 48 predictors, ROC-AUC on CV ~0.91\
+* model desc:   XGBClassifier, 48 predictors, ROC-AUC on CV ~0.91
 * output file:  [delay_df.csv](https://github.com/woldemarg/ds_tests/raw/master/machine_learning/company_3/task_solution/results/delay_df.csv)
 
 ## Future improvements:
