@@ -1,5 +1,5 @@
 ## Volodymyr Holomb
-#### data scientist applicant / [full CV](https://github.com/woldemarg/ds_tests)
+#### data scientist applicant / [full CV](https://docs.google.com/document/d/1i_rOz6NEZY_XRS3ZF626_kdPI960sQKZ6fGE0D9XCRo/edit?usp=sharing)
 
 
 
@@ -20,3 +20,12 @@
 * [description](https://github.com/woldemarg/ds_tests/tree/master/machine_learning/company_2/task_description) / [solution](https://github.com/woldemarg/ds_tests/tree/master/machine_learning/company_2/task_solution) (modelling in R, alternative modelling in Python)
 2. Company 3
 * [description](https://github.com/woldemarg/ds_tests/tree/master/machine_learning/company_3/task_description) / [solution](https://github.com/woldemarg/ds_tests/tree/master/machine_learning/company_3/task_solution) (model pipeline and custom transformers)
+
+## Kaggle competitions
+1. Titanic: Machine Learning from Disaster
+* [Titanic: imputting and classification pipes (Python)](https://www.kaggle.com/volodymyrholomb/titanic-imputing-and-classification-pipes)
+* [Titanic: basic ML and feature engineering (R)](https://www.kaggle.com/volodymyrholomb/titanic-basic-ml-with-feature-engineering-r)
+2. House Prices: Advanced Regression Techniques
+* [House Prices: predicting NAs and clustering (R)](https://www.kaggle.com/volodymyrholomb/house-prices-predicting-nas-and-clustering)
+3. San Francisco Crime Classification
+* [SF Crimes:log regression with target encoding (R)](https://www.kaggle.com/volodymyrholomb/sf-crimes-logregression-with-target-encoding)
