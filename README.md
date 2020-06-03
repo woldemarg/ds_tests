@@ -14,6 +14,8 @@
 ### Data analysis assignments
 1. Company 1
 * [description](https://github.com/woldemarg/ds_tests/tree/master/data_analysis/company_1/task_description) / [solution](https://github.com/woldemarg/ds_tests/tree/master/data_analysis/company_1/task_solution) (user stories, data insights with Python et al.)
+2. Company 4
+[description](https://github.com/woldemarg/ds_tests/tree/master/data_analysis/company_4/task_description) / [solution](https://github.com/woldemarg/ds_tests/tree/master/data_analysis/company_4/task_solution) (AB testing)
 
 ### Machine learning assignments
 1. Company 2
