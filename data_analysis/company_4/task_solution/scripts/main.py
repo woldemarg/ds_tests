@@ -25,9 +25,11 @@ def print_ab_results(data,
     if strategy == "periods":
         groups = (data
                   .groupby(["experiment_mobile_checkout_theme",
-                            pd.Grouper(key="date", freq=freq)])[key])
+                            pd.Grouper(key="date", freq=freq)],
+                           sort=False)[key])
     elif strategy == "features":
-        groups = data.groupby(param_list)[key]
+        groups = data.groupby(param_list,
+                              sort=False)[key]
 
     groupped = (groups
                 .agg(["sum", "size"])
@@ -35,10 +37,16 @@ def print_ab_results(data,
                             sort_remaining=True,
                             ascending=False))
 
-    for idx, df_select in groupped.groupby(level=-1):
-        print("B's conversion as for '{}' estimated by '{}' is better with {:.1%} confidence"
-              .format(idx, key, get_confidence_ab(df_select)))
+    if len(param_list) > 1:
+        for idx, df_select in groupped.groupby(level=-1, axis=0):
+            print("B's conversion as for '{}' estimated by '{}' is better with {:.1%} confidence"
+                  .format(idx, key, get_confidence_ab(df_select)))
+    else:
+        print("B's conversion estimated by '{}' is better with {:.1%} confidence"
+              .format(key, get_confidence_ab(groupped)))
 
 # %%
 print_ab_results(data=exp_data,
-                 key="transaction_success")
+                 key="transaction_try",
+                 strategy="features",
+                 param_list=["experiment_mobile_checkout_theme"])
