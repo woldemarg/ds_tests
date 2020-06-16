@@ -23,6 +23,10 @@
 2. Company 3
 * [description](https://github.com/woldemarg/ds_tests/tree/master/machine_learning/company_3/task_description) / [solution](https://github.com/woldemarg/ds_tests/tree/master/machine_learning/company_3/task_solution) (model pipeline and custom transformers)
 
+### Deploying ML model assignments
+1. Company 2
+[solution](https://github.com/woldemarg/ds_tests/tree/master/deploying_ml_project/company_2) (deploying ML pipe as an API on AWS using Docker)
+
 ## Kaggle competitions
 1. Titanic: Machine Learning from Disaster
 * [Titanic: imputting and classification pipes (Python)](https://www.kaggle.com/volodymyrholomb/titanic-imputing-and-classification-pipes)
