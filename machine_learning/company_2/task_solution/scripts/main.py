@@ -490,7 +490,7 @@ msg = "RF_best: %f (%f)" % (scores_best.mean(), scores_best.std())
 print(msg)
 
 # %%
-test_data = model_data_full[(model_data_full.pickup_date >= pd.Timestamp(2019, 1,1)) &
+test_data = model_data_full[(model_data_full.pickup_date >= pd.Timestamp(2019, 1, 1)) &
                             (model_data_full.pickup_date < pd.Timestamp(2019, 3, 1))]
 
 X_test = (test_data
