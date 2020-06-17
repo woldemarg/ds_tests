@@ -1,6 +1,3 @@
-### Notes:
-Task 1 should not be considered as completely fulfilled as it seems somewhat excessively comprehensive for a test assignment. As such I've prioritised my time with task 3.
-=======
 # Introductory note
 *Chitose* is known as a city in Hokkaido according to https://en.wikipedia.org/wiki/Chitose,_Hokkaido. The name of a  city was denoted by names of the given files, more specifically *jalan_shinchitose.csv* and *rakuten_shinchitose.csv*. Those names contain an extending *-shin-* which means *new* in Japanese https://www.japan-guide.com/forum/quereadisplay.html?0+57892 and therefore bring us new knowledge about *New Chitose Airport* as described here https://en.wikipedia.org/wiki/New_Chitose_Airport.
 
