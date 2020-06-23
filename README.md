@@ -16,6 +16,8 @@
 * [description](https://github.com/woldemarg/ds_tests/tree/master/data_analysis/company_1/task_description) / [solution](https://github.com/woldemarg/ds_tests/tree/master/data_analysis/company_1/task_solution) (user stories, data insights with Python et al.)
 2. Company 4
 * [description](https://github.com/woldemarg/ds_tests/tree/master/data_analysis/company_4/task_description) / [solution](https://github.com/woldemarg/ds_tests/tree/master/data_analysis/company_4/task_solution) (AB testing)
+3. Company_5
+ [description](https://github.com/woldemarg/ds_tests/tree/master/data_analysis/company_1/task_description) / [solution](https://github.com/woldemarg/ds_tests/tree/master/data_analysis/company_1/task_solution) (Excel, dashboard in Tableau)
 
 ### Machine learning assignments
 1. Company 2
@@ -35,3 +37,5 @@
 * [House Prices: predicting NAs and clustering (R)](https://www.kaggle.com/volodymyrholomb/house-prices-predicting-nas-and-clustering)
 3. San Francisco Crime Classification
 * [SF Crimes:log regression with target encoding (R)](https://www.kaggle.com/volodymyrholomb/sf-crimes-logregression-with-target-encoding)
+4. Home Credit Default Risk
+* [XGBmodel on base features (Python)](https://www.kaggle.com/volodymyrholomb/xgbmodel-on-base-features)
