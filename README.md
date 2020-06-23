@@ -17,7 +17,7 @@
 2. Company 4
 * [description](https://github.com/woldemarg/ds_tests/tree/master/data_analysis/company_4/task_description) / [solution](https://github.com/woldemarg/ds_tests/tree/master/data_analysis/company_4/task_solution) (AB testing)
 3. Company_5
- [description](https://github.com/woldemarg/ds_tests/tree/master/data_analysis/company_1/task_description) / [solution](https://github.com/woldemarg/ds_tests/tree/master/data_analysis/company_1/task_solution) (Excel, dashboard in Tableau)
+ [description](https://github.com/woldemarg/ds_tests/tree/master/data_analysis/company_5/task_description) / [solution](https://github.com/woldemarg/ds_tests/tree/master/data_analysis/company_5) (Excel, dashboard in Tableau)
 
 ### Machine learning assignments
 1. Company 2
