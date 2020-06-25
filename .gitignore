@@ -1,4 +1,5 @@
 **/.spyproject
 **/.pylint.d
 **/__pycache__
-
+.gitattributes
+**/.ipynb_checkpoints

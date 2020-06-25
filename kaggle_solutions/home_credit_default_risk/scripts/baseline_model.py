@@ -7,11 +7,11 @@ import pandas as pd
 import numpy as np
 
 # %%
-data = pd.read_csv("data/samples/app_samp.csv.gz",
+data = pd.read_csv("kaggle_solutions/home_credit_default_risk/data/samples/app_samp.csv.gz",
                    index_col=0,
                    compression="gzip")
 
-desc = pd.read_csv("data/raw/HomeCredit_columns_description.csv",
+desc = pd.read_csv("kaggle_solutions/home_credit_default_risk/data/raw/HomeCredit_columns_description.csv",
                    index_col=0,
                    quotechar='"')
 
