@@ -16,9 +16,16 @@ data = pd.read_csv("kaggle_solutions/home_credit_default_risk/data/samples/app_s
                    index_col=0,
                    compression="gzip")
 
+bureau_curr = pd.read_csv("kaggle_solutions/home_credit_default_risk/derived/bureau_curr.csv",
+                          index_col=0)
+
 data.set_index("SK_ID_CURR",
                drop=True,
                inplace=True)
+
+data = data.join(bureau_curr)
+
+
 
 # %%
 cols_to_impute_w_null = ["AMT_GOODS_PRICE",

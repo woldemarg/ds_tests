@@ -192,6 +192,12 @@ X_test = pd.get_dummies(X_test)
 X_train, X_test = X_train.align(X_test, join="left", axis=1)
 
 # %%
+X_train.to_csv("kaggle_solutions/home_credit_default_risk/derived/X_train.csv")
+X_test.to_csv("kaggle_solutions/home_credit_default_risk/derived/X_test.csv")
+y_train.to_csv("kaggle_solutions/home_credit_default_risk/derived/y_train.csv")
+y_test.to_csv("kaggle_solutions/home_credit_default_risk/derived/y_test.csv")
+
+# %%
 target = y_train.value_counts()
 spw = target[0] / target[1]
 
