@@ -3,3 +3,4 @@
 **/__pycache__
 .gitattributes
 **/.ipynb_checkpoints
+kaggle_solutions/home_credit_default_risk/data/raw/

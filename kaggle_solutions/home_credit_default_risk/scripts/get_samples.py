@@ -3,12 +3,12 @@ from sklearn.model_selection import StratifiedShuffleSplit
 import pandas as pd
 
 # %%
-app_train = pd.read_csv("data/raw/application_train.csv.gz",
+app_train = pd.read_csv("kaggle_solutions/home_credit_default_risk/data/raw/application_train.csv.gz",
                         compression="gzip")
 
 # %%
 str_split = StratifiedShuffleSplit(n_splits=1,
-                                   test_size=0.01 ,
+                                   test_size=0.01,
                                    random_state=1234)
 
 for trn_idx, tst_idx in str_split.split(app_train,
@@ -17,22 +17,22 @@ for trn_idx, tst_idx in str_split.split(app_train,
     app_samp = app_train.reindex(tst_idx)
 
 # %%
-bureau_balance = pd.read_csv("data/raw/bureau_balance.csv.gz",
+bureau_balance = pd.read_csv("kaggle_solutions/home_credit_default_risk/data/raw/bureau_balance.csv.gz",
                              compression="gzip")
 
-bureau = pd.read_csv("data/raw/bureau.csv.gz",
+bureau = pd.read_csv("kaggle_solutions/home_credit_default_risk/data/raw/bureau.csv.gz",
                      compression="gzip")
 
-credit_card_balance = pd.read_csv("data/raw/credit_card_balance.csv.gz",
+credit_card_balance = pd.read_csv("kaggle_solutions/home_credit_default_risk/data/raw/credit_card_balance.csv.gz",
                                   compression="gzip")
 
-installments_payments = pd.read_csv("data/raw/installments_payments.csv.gz",
+installments_payments = pd.read_csv("kaggle_solutions/home_credit_default_risk/data/raw/installments_payments.csv.gz",
                                     compression="gzip")
 
-POS_CASH_balance = pd.read_csv("data/raw/POS_CASH_balance.csv.gz",
+POS_CASH_balance = pd.read_csv("kaggle_solutions/home_credit_default_risk/data/raw/POS_CASH_balance.csv.gz",
                                compression="gzip")
 
-previous_application = pd.read_csv("data/raw/previous_application.csv.gz",
+previous_application = pd.read_csv("kaggle_solutions/home_credit_default_risk/data/raw/previous_application.csv.gz",
                                    compression="gzip")
 
 # %%
@@ -75,14 +75,15 @@ my_dict = {"app_samp": app_samp,
            "bur_samp": bur_samp,
            "bur_bal_samp": bur_bal_samp,
            "prev_app_samp": prev_app_samp,
-           "ps_bal_sampp": ps_bal_samp,
+           "ps_bal_samp": ps_bal_samp,
            "in_pay_samp": in_pay_samp,
            "cc_bal_samp": cc_bal_samp}
 
 
 def to_csv(d):
     for key, value in d.items():
-        value.to_csv("data/samples/" + key + ".csv.gz",
+        value.to_csv("kaggle_solutions/home_credit_default_risk/data/samples/"
+                     + key + ".csv.gz",
                      compression="gzip")
 
 
