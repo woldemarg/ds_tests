@@ -24,22 +24,6 @@ bureau_balance = pd.read_csv("kaggle_solutions/home_credit_default_risk/data/sam
                              index_col=0)
 
 # %%
-pos_cash_balance = pd.read_csv("kaggle_solutions/home_credit_default_risk/data/samples/ps_bal_samp.csv.gz",
-                               index_col=0)
-
-# %%
-credit_card_balance = pd.read_csv("kaggle_solutions/home_credit_default_risk/data/samples/cc_bal_samp.csv.gz",
-                                  index_col=0)
-
-# %%
-previous_application = pd.read_csv("kaggle_solutions/home_credit_default_risk/data/samples/prev_app_samp.csv.gz",
-                                   index_col=0)
-
-# %%
-installments_payments = pd.read_csv("kaggle_solutions/home_credit_default_risk/data/samples/in_pay_samp.csv.gz",
-                                    index_col=0)
-
-# %%
 def get_stats(df):
     univ = pd.Series(data=[df[col].nunique()
                            if df[col].dtype == "object"
