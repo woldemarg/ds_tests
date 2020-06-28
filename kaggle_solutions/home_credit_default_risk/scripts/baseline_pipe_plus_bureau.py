@@ -25,8 +25,6 @@ data.set_index("SK_ID_CURR",
 
 data = data.join(bureau_curr)
 
-
-
 # %%
 cols_to_impute_w_null = ["AMT_GOODS_PRICE",
                          "OBS_30_CNT_SOCIAL_CIRCLE",
