@@ -40,7 +40,7 @@ class ExtSourceIntegrity(BaseEstimator):
                                                  .isnull().sum() == 3) else
                                              (row[self.ext_source_cols].mean() *
                                               (1 - row[self.ext_source_cols]
-                                              .isnull().mean())), axis=1))
+                                               .isnull().mean())), axis=1))
         return X
 
 # %%

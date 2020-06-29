@@ -81,13 +81,11 @@ bureau_curr["loan_num"] = bureau_mod_gr.size()
 
 bureau_curr["loan_act"] = (bureau_mod_gr
                            .apply(lambda d:
-                                  len(d.loc[d["CREDIT_ACTIVE"] == "Active",
-                                            :]) / len(d)))
+                                  (d["CREDIT_ACTIVE"] == "Active").sum()))
 
 bureau_curr["loan_ovd"] = (bureau_mod_gr
                            .apply(lambda d:
-                                  len(d.loc[d["CREDIT_DAY_OVERDUE"] != 0,
-                                            :]) / len(d)))
+                                  (d["CREDIT_DAY_OVERDUE"] != 0).sum()))
 
 bureau_curr["loan_bal"] = (bureau_mod_gr
                            .apply(get_loan_balance))
@@ -114,6 +112,11 @@ y_test = pd.read_csv("kaggle_solutions/home_credit_default_risk/derived/y_test.c
 # %%
 X_train_plus = X_train.join(bureau_curr)
 X_test_plus = X_test.join(bureau_curr)
+
+(X_train_plus
+.to_csv("kaggle_solutions/home_credit_default_risk/derived/X_train_plus.csv"))
+(X_test_plus
+.to_csv("kaggle_solutions/home_credit_default_risk/derived/X_test_plus.csv"))
 
 target = y_train["TARGET"].value_counts()
 spw = target[0] / target[1]

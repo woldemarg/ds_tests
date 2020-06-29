@@ -3,7 +3,7 @@ import sys
 sys.path.append("kaggle_solutions/home_credit_default_risk/scripts")
 
 from sklearn.pipeline import Pipeline
-from sklearn.model_selection import GridSearchCV
+from sklearn.model_selection import cross_val_score
 
 from xgboost import XGBClassifier
 
@@ -19,11 +19,16 @@ data = pd.read_csv("kaggle_solutions/home_credit_default_risk/data/samples/app_s
 bureau_curr = pd.read_csv("kaggle_solutions/home_credit_default_risk/derived/bureau_curr.csv",
                           index_col=0)
 
+p_apps_curr = pd.read_csv("kaggle_solutions/home_credit_default_risk/derived/p_apps_curr.csv",
+                          index_col=0)
+
 data.set_index("SK_ID_CURR",
                drop=True,
                inplace=True)
 
-data = data.join(bureau_curr)
+data = (data
+        .join(bureau_curr)
+        .join(p_apps_curr))
 
 # %%
 cols_to_impute_w_null = ["AMT_GOODS_PRICE",
@@ -64,6 +69,8 @@ spw = target[0] / target[1]
 xgb_model = XGBClassifier(random_state=1234,
                           objective="binary:logistic",
                           scale_pos_weight=spw,
+                          n_estimators=1000,
+                          learning_rate=0.001,
                           n_jobs=-1)
 
 model_pipe = Pipeline(
@@ -84,22 +91,11 @@ model_pipe = Pipeline(
 y_sample = data["TARGET"]
 X_sample = data.drop(["TARGET"], axis=1).copy()
 
-param_grid = {"xgb_model__n_estimators": [500, 750, 1000],
-              "xgb_model__learning_rate": [0.001, 0.01, 0.1]}
-
-search_cv = GridSearchCV(model_pipe,
-                         param_grid=param_grid,
-                         scoring="roc_auc",
-                         n_jobs=-1)
-
-search_cv.fit(X_sample, y_sample)
-
-print("Best ROC-AUC on CV: {}:".format(search_cv.best_score_))
-print(search_cv.best_params_)
-
-# %%
-model_pipe.set_params(xgb_model__n_estimators=1000,
-                      xgb_model__learning_rate=0.001)
+print(cross_val_score(model_pipe,
+                      X_sample,
+                      y_sample,
+                      scoring="roc_auc")
+      .mean())
 
 # %%
 model_pipe.fit(X_sample, y_sample)
@@ -108,12 +104,3 @@ xgb_fea_imp = (pd.DataFrame(list(model_pipe.steps[-1][-1].get_booster()
                                  .get_fscore().items()),
                             columns=["feature", "importance"])
                .sort_values("importance", ascending=False))
-
-# %%
-from sklearn.model_selection import cross_val_score
-
-print(cross_val_score(model_pipe,
-                      X_sample,
-                      y_sample,
-                      scoring="roc_auc")
-      .mean())
