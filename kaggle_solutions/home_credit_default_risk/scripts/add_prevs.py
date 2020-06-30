@@ -207,13 +207,13 @@ p_apps_curr["hc_loan_amt_type"] = (p_apps_mod_gr
                                                          "NAME_CONTRACT_TYPE"]),
                                                 "AMT_CREDIT"].sum()))
 
-p_apps_curr["has_occ_changed"] = (p_apps_mod_gr
-                                  .apply(lambda d:
-                                         d.loc[d["NAME_CONTRACT_STATUS"] == "Approved",
-                                               "DAYS_TERM_UPD"].max() >
-                                         data.at[d["SK_ID_CURR"]
-                                                 .iloc[0],
-                                                 "DAYS_EMPLOYED"]) * 1)
+# p_apps_curr["has_occ_changed"] = (p_apps_mod_gr
+#                                   .apply(lambda d:
+#                                          d.loc[d["NAME_CONTRACT_STATUS"] == "Approved",
+#                                                "DAYS_TERM_UPD"].max() >
+#                                          data.at[d["SK_ID_CURR"]
+#                                                  .iloc[0],
+#                                                  "DAYS_EMPLOYED"]) * 1)
 
 p_apps_curr["has_lim_exceeded"] = (p_apps_mod_gr
                                    .apply(lambda d:
