@@ -1,8 +1,10 @@
 # %%
+import itertools
+import re
+
 from sklearn.metrics import roc_auc_score
 from xgboost import XGBClassifier
 
-import itertools
 import pandas as pd
 import numpy as np
 
@@ -90,22 +92,26 @@ p_apps_mod = (p_apps
               .copy())
 
 # %%
-psb_term = (pos_cash_balance
-            .groupby("SK_ID_PREV")
-            .apply(lambda d:
-                   d.loc[d["NAME_CONTRACT_STATUS"] == "Completed",
-                         "MONTHS_BALANCE"].max() * 30)
-            .rename("DAYS_TERM_UPD"))
+# psb_term = (pos_cash_balance
+#             .groupby("SK_ID_PREV")
+#             .apply(lambda d:
+#                    d.loc[d["NAME_CONTRACT_STATUS"] == "Completed",
+#                          "MONTHS_BALANCE"].max() * 30)
+#             .rename("DAYS_TERM_UPD"))
 
-p_apps_mod = pd.merge(left=p_apps_mod,
-                      right=psb_term,
-                      how="left",
-                      left_on="SK_ID_PREV",
-                      right_index=True)
+# p_apps_mod = pd.merge(left=p_apps_mod,
+#                       right=psb_term,
+#                       how="left",
+#                       left_on="SK_ID_PREV",
+#                       right_index=True)
 
-p_apps_mod["DAYS_TERM_UPD"] = [max(t) for t in
-                               list(zip(p_apps_mod["DAYS_TERMINATION"],
-                                        p_apps_mod["DAYS_TERM_UPD"]))]
+# p_apps_mod["DAYS_TERMINATION"] = [max(t) for t in
+#                                   list(zip(p_apps_mod["DAYS_TERMINATION"],
+#                                            p_apps_mod["DAYS_TERM_UPD"]))]
+
+# p_apps_mod.drop(["DAYS_TERM_UPD"],
+#                 axis=1,
+#                 inplace=True)
 
 # %%
 overdued = (installments_payments
@@ -158,9 +164,9 @@ p_apps_curr["hc_loan_num_type"] = (p_apps_mod_gr
                                    .apply(lambda d:
                                           ((d["NAME_CONTRACT_STATUS"] ==
                                             "Approved") & (d["NAME_CONTRACT_TYPE"] ==
-                                                              data.at[d["SK_ID_CURR"]
-                                                                      .iloc[0],
-                                                                      "NAME_CONTRACT_TYPE"]))
+                                                           data.at[d["SK_ID_CURR"]
+                                                                   .iloc[0],
+                                                                   "NAME_CONTRACT_TYPE"]))
                                           .sum()))
 
 p_apps_curr["hc_ref_num"] = (p_apps_mod_gr
@@ -171,10 +177,10 @@ p_apps_curr["hc_ref_num"] = (p_apps_mod_gr
 p_apps_curr["hc_ref_num_type"] = (p_apps_mod_gr
                                   .apply(lambda d:
                                          ((d["NAME_CONTRACT_STATUS"] ==
-                                          "Refused") & (d["NAME_CONTRACT_TYPE"] ==
-                                                             data.at[d["SK_ID_CURR"]
-                                                                     .iloc[0],
-                                                                     "NAME_CONTRACT_TYPE"]))
+                                           "Refused") & (d["NAME_CONTRACT_TYPE"] ==
+                                                         data.at[d["SK_ID_CURR"]
+                                                                 .iloc[0],
+                                                                 "NAME_CONTRACT_TYPE"]))
                                          .sum()))
 
 p_apps_curr["hc_loan_ovd"] = (p_apps_mod_gr
@@ -196,7 +202,7 @@ p_apps_curr["hc_loan_ovd_type"] = (p_apps_mod_gr
 p_apps_curr["hc_loan_amt"] = (p_apps_mod_gr
                               .apply(lambda d:
                                      d.loc[d["NAME_CONTRACT_STATUS"] == "Approved",
-                                                "AMT_CREDIT"].sum()))
+                                           "AMT_CREDIT"].sum()))
 
 p_apps_curr["hc_loan_amt_type"] = (p_apps_mod_gr
                                    .apply(lambda d:
@@ -207,19 +213,22 @@ p_apps_curr["hc_loan_amt_type"] = (p_apps_mod_gr
                                                          "NAME_CONTRACT_TYPE"]),
                                                 "AMT_CREDIT"].sum()))
 
-# p_apps_curr["has_occ_changed"] = (p_apps_mod_gr
-#                                   .apply(lambda d:
-#                                          d.loc[d["NAME_CONTRACT_STATUS"] == "Approved",
-#                                                "DAYS_TERM_UPD"].max() >
-#                                          data.at[d["SK_ID_CURR"]
-#                                                  .iloc[0],
-#                                                  "DAYS_EMPLOYED"]) * 1)
-
 p_apps_curr["has_lim_exceeded"] = (p_apps_mod_gr
                                    .apply(lambda d:
                                           ((d["NAME_CONTRACT_STATUS"] ==
                                             "Approved") & (d["limit_exceeded"]))
                                           .sum()))
+
+# p_apps_curr["has_occ_changed"] = (p_apps_mod_gr
+#                                   .apply(lambda d:
+#                                          0 if data.at[d["SK_ID_CURR"]
+#                                                       .iloc[0],
+#                                                       "DAYS_EMPLOYED"] >
+        #                                  d["DAYS_DECISION"].max() or
+#                                          data.at[d["SK_ID_CURR"]
+#                                                  .iloc[0],
+#                                                  "DAYS_EMPLOYED"] == 365243
+#                                          else 1))
 
 p_apps_curr.fillna(0,
                    axis=0,
@@ -244,6 +253,44 @@ y_test = pd.read_csv("kaggle_solutions/home_credit_default_risk/derived/y_test.c
 X_train_pp = X_train_plus.join(p_apps_curr)
 X_test_pp = X_test_plus.join(p_apps_curr)
 
+# %%
+col_ls = ["AMT_INCOME_TOTAL",
+          "AMT_CREDIT",
+          "AMT_ANNUITY",
+          "AMT_GOODS_PRICE",
+          "loan_bal",
+          "hc_loan_amt",
+          "hc_loan_amt_type"]
+
+col_bins = {}
+
+for col in col_ls:
+    vals, bins = pd.qcut(x=X_train_pp[col],
+                         q=50,
+                         duplicates="drop",
+                         precision=0,
+                         retbins=True)
+    col_bins.update({col: bins})
+    X_train_pp[col] = pd.cut(X_train_pp[col],
+                             col_bins[col])
+    X_test_pp[col] = pd.cut(X_test_pp[col],
+                            col_bins[col])
+
+X_train_pp = pd.get_dummies(X_train_pp)
+X_test_pp = pd.get_dummies(X_test_pp)
+
+X_train_pp, X_test_pp = X_train_pp.align(X_test_pp, join="left", axis=1)
+
+# %%
+regex = re.compile(r"\[|\]|<", re.IGNORECASE)
+
+X_train_pp.columns = [regex.sub("_", col)
+                      if any(x in str(col) for x in set(('[', ']', '<')))
+                      else col for col in X_train_pp.columns.values]
+
+X_test_pp.columns = X_train_pp.columns
+
+# %%
 target = y_train["TARGET"].value_counts()
 spw = target[0] / target[1]
 
