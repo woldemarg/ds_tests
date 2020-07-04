@@ -201,12 +201,14 @@ p_apps_curr["hc_loan_ovd_type"] = (p_apps_mod_gr
 
 p_apps_curr["hc_loan_amt"] = (p_apps_mod_gr
                               .apply(lambda d:
-                                     d.loc[d["NAME_CONTRACT_STATUS"] == "Approved",
+                                     d.loc[d["NAME_CONTRACT_STATUS"] ==
+                                           "Approved",
                                            "AMT_CREDIT"].sum()))
 
 p_apps_curr["hc_loan_amt_type"] = (p_apps_mod_gr
                                    .apply(lambda d:
-                                          d.loc[(d["NAME_CONTRACT_STATUS"] == "Approved") &
+                                          d.loc[(d["NAME_CONTRACT_STATUS"] ==
+                                                 "Approved") &
                                                 (d["NAME_CONTRACT_TYPE"] ==
                                                  data.at[d["SK_ID_CURR"]
                                                          .iloc[0],
@@ -224,7 +226,7 @@ p_apps_curr["has_lim_exceeded"] = (p_apps_mod_gr
 #                                          0 if data.at[d["SK_ID_CURR"]
 #                                                       .iloc[0],
 #                                                       "DAYS_EMPLOYED"] >
-        #                                  d["DAYS_DECISION"].max() or
+#                                          d["DAYS_DECISION"].max() or
 #                                          data.at[d["SK_ID_CURR"]
 #                                                  .iloc[0],
 #                                                  "DAYS_EMPLOYED"] == 365243
@@ -285,7 +287,7 @@ X_train_pp, X_test_pp = X_train_pp.align(X_test_pp, join="left", axis=1)
 regex = re.compile(r"\[|\]|<", re.IGNORECASE)
 
 X_train_pp.columns = [regex.sub("_", col)
-                      if any(x in str(col) for x in set(('[', ']', '<')))
+                      if any(x in str(col) for x in set(("[", "]", "<")))
                       else col for col in X_train_pp.columns.values]
 
 X_test_pp.columns = X_train_pp.columns

@@ -3,11 +3,13 @@ import sys
 sys.path.append("kaggle_solutions/home_credit_default_risk/scripts")
 
 from sklearn.pipeline import Pipeline
-from sklearn.model_selection import cross_val_score
+from sklearn.model_selection import cross_val_score, validation_curve
+from sklearn.model_selection import RandomizedSearchCV
 
 from xgboost import XGBClassifier
 
 import pandas as pd
+import numpy as np
 
 import custom_transformers as tr
 
@@ -57,6 +59,14 @@ occu_gr_cols = ["NAME_INCOME_TYPE",
 
 exp_gr_cols = ["ORGANIZATION_TYPE", "OCCUPATION_TYPE"]
 
+cols_to_discretize = ["AMT_INCOME_TOTAL",
+                      "AMT_CREDIT",
+                      "AMT_ANNUITY",
+                      "AMT_GOODS_PRICE",
+                      "loan_bal",
+                      "hc_loan_amt",
+                      "hc_loan_amt_type"]
+
 cols_to_drop = (apartments_cols.tolist() +
                 ext_source_cols.tolist() +
                 ["EXP_GR_MAX", "EXP_GR_MIN"])
@@ -69,21 +79,20 @@ spw = target[0] / target[1]
 xgb_model = XGBClassifier(random_state=1234,
                           objective="binary:logistic",
                           scale_pos_weight=spw,
-                          n_estimators=1000,
-                          learning_rate=0.001,
                           n_jobs=-1)
 
 model_pipe = Pipeline(
     steps=[
         ("impute_nums", tr.CustomImputer(strategy="constant",
                                          cols=cols_to_impute_w_null)),
-        ("impute_cats",tr.CustomImputer(strategy="mode",
-                                        cols="NAME_TYPE_SUITE")),
+        ("impute_cats", tr.CustomImputer(strategy="mode",
+                                         cols="NAME_TYPE_SUITE")),
         ("get_ext_source_integrity", tr.ExtSourceIntegrity(ext_source_cols)),
         ("impute_occupations", tr.OccupationsImputer(occu_gr_cols)),
         ("normalize_days_employed", tr.DaysEmployedNormalizer(exp_gr_cols)),
         ("get_apart_desc_integrity", tr.SimpleColumnsAdder(apartments_cols,
                                                            cols_to_drop)),
+        ("dicretize_amt", tr.CustomQuantileDiscretizer(cols_to_discretize)),
         ("oh_encoding", tr.CustomOHEncoder()),
         ("xgb_model", xgb_model)])
 
@@ -96,6 +105,28 @@ print(cross_val_score(model_pipe,
                       y_sample,
                       scoring="roc_auc")
       .mean())
+
+# %%
+param_grid = {"xgb_model__learning_rate":[0.01, 0.05, 0.1] ,
+              "xgb_model__max_depth": [5, 10, 15],
+              "xgb_model__min_child_weight": [1, 3, 5],
+              "xgb_model__gamma": [0.0, 0.15, 0.3],
+              "xgb_model__colsample_bytree" : [0.3, 0.5, 0.7],
+              "xgb_model__n_estimators": [500, 750, 1000],
+              "dicretize_amt__q": [50, 60, 70]}
+
+search_cv = RandomizedSearchCV(estimator=model_pipe,
+                               param_distributions=param_grid,
+                               scoring="roc_auc",
+                               n_jobs=-1)
+
+search_cv.fit(X_sample, y_sample)
+
+print("Best ROC-AUC on CV: {}:".format(search_cv.best_score_))
+print(search_cv.best_params_)
+
+# %%
+model_pipe.set_params(dicretize_amt__q=)
 
 # %%
 model_pipe.fit(X_sample, y_sample)
