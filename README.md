@@ -10,6 +10,8 @@
 2. Company 2
 * [description](https://github.com/woldemarg/ds_tests/tree/master/SQL/company_2/test_1/task_description) / [solution](https://github.com/woldemarg/ds_tests/tree/master/SQL/company_2/test_1/task_solution) (profiling and triggers et al.)
 * [description](https://github.com/woldemarg/ds_tests/tree/master/SQL/company_2/test_2/task_description) / [solution](https://github.com/woldemarg/ds_tests/tree/master/SQL/company_2/test_2/task_solution) (pivot table et al.)
+3. Company 6
+* [description](https://github.com/woldemarg/ds_tests/tree/master/SQL/company_6/task_description) / [solution](https://github.com/woldemarg/ds_tests/tree/master/SQL/company_6/task_solution) (group by et al.)
 
 ### Data analysis assignments
 1. Company 1
