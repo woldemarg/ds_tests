@@ -3,13 +3,12 @@ import sys
 sys.path.append("kaggle_solutions/home_credit_default_risk/scripts")
 
 from sklearn.pipeline import Pipeline
-from sklearn.model_selection import cross_val_score, validation_curve
+from sklearn.model_selection import cross_val_score
 from sklearn.model_selection import RandomizedSearchCV
 
 from xgboost import XGBClassifier
 
 import pandas as pd
-import numpy as np
 
 import custom_transformers as tr
 
@@ -31,6 +30,8 @@ data.set_index("SK_ID_CURR",
 data = (data
         .join(bureau_curr)
         .join(p_apps_curr))
+
+data["DAYS_EMPLOYED"].replace({365243: -1}, inplace=True)
 
 # %%
 cols_to_impute_w_null = ["AMT_GOODS_PRICE",
@@ -69,7 +70,7 @@ cols_to_discretize = ["AMT_INCOME_TOTAL",
 
 cols_to_drop = (apartments_cols.tolist() +
                 ext_source_cols.tolist() +
-                ["EXP_GR_MAX", "EXP_GR_MIN"])
+                ["mean", "std", "zscore"])
 
 # %%
 target = data["TARGET"].value_counts()
@@ -86,13 +87,14 @@ model_pipe = Pipeline(
         ("impute_nums", tr.CustomImputer(strategy="constant",
                                          cols=cols_to_impute_w_null)),
         ("impute_cats", tr.CustomImputer(strategy="mode",
-                                         cols="NAME_TYPE_SUITE")),
+                                        cols="NAME_TYPE_SUITE")),
         ("get_ext_source_integrity", tr.ExtSourceIntegrity(ext_source_cols)),
         ("impute_occupations", tr.OccupationsImputer(occu_gr_cols)),
-        ("normalize_days_employed", tr.DaysEmployedNormalizer(exp_gr_cols)),
+        ("normalize_days_employed", tr.DaysEmployedZscore(exp_gr_cols)),
+        ("discretizing_zscore", tr.ZscoreQuantileDiscretizer()),
         ("get_apart_desc_integrity", tr.SimpleColumnsAdder(apartments_cols,
                                                            cols_to_drop)),
-        ("dicretize_amt", tr.CustomQuantileDiscretizer(cols_to_discretize)),
+        ("discretizing_amt", tr.CustomQuantileDiscretizer(cols_to_discretize)),
         ("oh_encoding", tr.CustomOHEncoder()),
         ("xgb_model", xgb_model)])
 
@@ -107,7 +109,7 @@ print(cross_val_score(model_pipe,
       .mean())
 
 # %%
-param_grid = {"xgb_model__learning_rate":[0.01, 0.05, 0.1] ,
+param_grid = {"xgb_model__learning_rate":[0.01, 0.05, 0.1],
               "xgb_model__max_depth": [5, 10, 15],
               "xgb_model__min_child_weight": [1, 3, 5],
               "xgb_model__gamma": [0.0, 0.15, 0.3],
@@ -124,9 +126,6 @@ search_cv.fit(X_sample, y_sample)
 
 print("Best ROC-AUC on CV: {}:".format(search_cv.best_score_))
 print(search_cv.best_params_)
-
-# %%
-model_pipe.set_params(dicretize_amt__q=)
 
 # %%
 model_pipe.fit(X_sample, y_sample)

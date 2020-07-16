@@ -19,6 +19,8 @@ data = pd.read_csv("kaggle_solutions/home_credit_default_risk/data/samples/app_s
 bureau_curr = pd.read_csv("kaggle_solutions/home_credit_default_risk/derived/bureau_curr.csv",
                           index_col=0)
 
+data["DAYS_EMPLOYED"].replace({365243: 0}, inplace=True)
+
 data.set_index("SK_ID_CURR",
                drop=True,
                inplace=True)
@@ -70,7 +72,7 @@ model_pipe = Pipeline(
     steps=[
         ("impute_nums", tr.CustomImputer(strategy="constant",
                                          cols=cols_to_impute_w_null)),
-        ("impute_cats",tr.CustomImputer(strategy="mode",
+        ("impute_cats", tr.CustomImputer(strategy="mode",
                                         cols="NAME_TYPE_SUITE")),
         ("get_ext_source_integrity", tr.ExtSourceIntegrity(ext_source_cols)),
         ("impute_occupations", tr.OccupationsImputer(occu_gr_cols)),

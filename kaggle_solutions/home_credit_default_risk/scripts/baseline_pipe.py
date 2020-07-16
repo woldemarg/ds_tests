@@ -3,7 +3,7 @@ import sys
 sys.path.append("kaggle_solutions/home_credit_default_risk/scripts")
 
 from sklearn.pipeline import Pipeline
-from sklearn.model_selection import GridSearchCV
+from sklearn.model_selection import cross_val_score, GridSearchCV
 
 from xgboost import XGBClassifier
 
@@ -20,6 +20,7 @@ data.set_index("SK_ID_CURR",
                drop=True,
                inplace=True)
 
+data["DAYS_EMPLOYED"].replace({365243: -1}, inplace=True)
 # %%
 cols_to_impute_w_null = ["AMT_GOODS_PRICE",
                          "OBS_30_CNT_SOCIAL_CIRCLE",
@@ -49,7 +50,7 @@ exp_gr_cols = ["ORGANIZATION_TYPE", "OCCUPATION_TYPE"]
 
 cols_to_drop = (apartments_cols.tolist() +
                 ext_source_cols.tolist() +
-                ["EXP_GR_MAX", "EXP_GR_MIN"])
+                ["mean", "std", "zscore"])
 
 # %%
 target = data["TARGET"].value_counts()
@@ -65,11 +66,12 @@ model_pipe = Pipeline(
     steps=[
         ("impute_nums", tr.CustomImputer(strategy="constant",
                                          cols=cols_to_impute_w_null)),
-        ("impute_cats",tr.CustomImputer(strategy="mode",
+        ("impute_cats", tr.CustomImputer(strategy="mode",
                                         cols="NAME_TYPE_SUITE")),
         ("get_ext_source_integrity", tr.ExtSourceIntegrity(ext_source_cols)),
         ("impute_occupations", tr.OccupationsImputer(occu_gr_cols)),
-        ("normalize_days_employed", tr.DaysEmployedNormalizer(exp_gr_cols)),
+        ("normalize_days_employed", tr.DaysEmployedZscore(exp_gr_cols)),
+        ("discretizing_zscore", tr.ZscoreQuantileDiscretizer()),
         ("get_apart_desc_integrity", tr.SimpleColumnsAdder(apartments_cols,
                                                            cols_to_drop)),
         ("oh_encoding", tr.CustomOHEncoder()),
@@ -79,6 +81,13 @@ model_pipe = Pipeline(
 y_sample = data["TARGET"]
 X_sample = data.drop(["TARGET"], axis=1).copy()
 
+print(cross_val_score(model_pipe,
+                      X_sample,
+                      y_sample,
+                      scoring="roc_auc")
+      .mean())
+
+# %%
 param_grid = {"xgb_model__n_estimators": [500, 750, 1000],
               "xgb_model__learning_rate": [0.001, 0.01, 0.1]}
 

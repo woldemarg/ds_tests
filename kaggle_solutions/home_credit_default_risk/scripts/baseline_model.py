@@ -1,4 +1,6 @@
 # %%
+import re
+
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import roc_auc_score
 from xgboost import XGBClassifier
@@ -14,6 +16,8 @@ data = pd.read_csv("kaggle_solutions/home_credit_default_risk/data/samples/app_s
 desc = pd.read_csv("kaggle_solutions/home_credit_default_risk/data/raw/HomeCredit_columns_description.csv",
                    index_col=0,
                    quotechar='"')
+
+data["DAYS_EMPLOYED"].replace({365243: -1}, inplace=True)
 
 # %%
 univ = pd.Series(data=[data[col].nunique()
@@ -133,6 +137,7 @@ X_test.set_index(["SK_ID_CURR"], inplace=True)
 # %%
 exp_gr_cols = ["ORGANIZATION_TYPE", "OCCUPATION_TYPE"]
 
+# %%
 exp_gr_range = (X_train
                 .groupby(exp_gr_cols)["DAYS_EMPLOYED"]
                 .agg(["min", "max"]))
@@ -166,6 +171,30 @@ X_test["DAYS_EMPLOYED_GR_NORM"] = X_test.apply(normalize_exp,
                                                axis=1)
 
 # %%
+mean_std = (X_train
+            .groupby(exp_gr_cols)["DAYS_EMPLOYED"]
+            .agg(["mean", "std"]))
+
+X_train = (X_train
+           .merge(mean_std,
+                  how="left",
+                  left_on=exp_gr_cols,
+                  right_index=True))
+
+X_train = X_train.eval("zscore = (DAYS_EMPLOYED - mean) / std")
+
+X_test = (X_test
+          .merge(mean_std,
+                 how="left",
+                 left_on=exp_gr_cols,
+                 right_index=True))
+
+X_test = X_test.eval("zscore = (DAYS_EMPLOYED - mean) / std")
+
+X_train["zscore"].fillna(0, inplace=True)
+X_test["zscore"].fillna(0, inplace=True)
+
+# %%
 X_train = X_train.eval("ANNUITY_RATIO = AMT_ANNUITY / AMT_INCOME_TOTAL")
 X_test = X_test.eval("ANNUITY_RATIO = AMT_ANNUITY / AMT_INCOME_TOTAL")
 
@@ -173,9 +202,29 @@ X_train = X_train.eval("GOODS_RATIO = AMT_GOODS_PRICE / AMT_CREDIT")
 X_test = X_test.eval("GOODS_RATIO = AMT_GOODS_PRICE / AMT_CREDIT")
 
 # %%
+vals, bins = pd.qcut(x=X_train["zscore"],
+                     q=7,
+                     duplicates="drop",
+                     precision=0,
+                     retbins=True)
+
+X_train["zscore_disc"] = pd.cut(X_train["zscore"],
+                                bins,
+                                include_lowest=True)
+
+X_test["zscore"] = [min(bins) if v < min(bins)
+                    else max(bins) if v > max(bins)
+                    else v for v in X_test["zscore"]]
+
+X_test["zscore_disc"] = pd.cut(X_test["zscore"],
+                               bins,
+                               include_lowest=True)
+
+# %%
 cols_to_drop = (apartments_cols.tolist() +
                 ext_source_cols.tolist() +
-                exp_gr_range.columns.tolist())
+                #exp_gr_range.columns.tolist() +
+                ["mean", "std", "zscore"])
 
 X_train.drop(cols_to_drop,
              axis=1,
@@ -191,6 +240,17 @@ X_test = pd.get_dummies(X_test)
 
 X_train, X_test = X_train.align(X_test, join="left", axis=1)
 
+X_train.fillna(0, inplace=True)
+X_test.fillna(0, inplace=True)
+
+# %%
+regex = re.compile(r"\[|\]|<", re.IGNORECASE)
+
+X_train.columns = [regex.sub("_", col)
+                   if any(x in str(col) for x in set(("[", "]", "<")))
+                   else col for col in X_train.columns.values]
+
+X_test.columns = X_train.columns
 # %%
 X_train.to_csv("kaggle_solutions/home_credit_default_risk/derived/X_train.csv")
 X_test.to_csv("kaggle_solutions/home_credit_default_risk/derived/X_test.csv")

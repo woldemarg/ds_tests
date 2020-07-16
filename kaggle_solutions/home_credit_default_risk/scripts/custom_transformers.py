@@ -44,7 +44,7 @@ class ExtSourceIntegrity(BaseEstimator):
                                                         .isnull().sum() == 3)
                                                     else (row[self.ext_source_cols]
                                                           .mean() *
-                                                     (1 - row[self.ext_source_cols]
+                                                          (1 - row[self.ext_source_cols]
                                                       .isnull().mean())), axis=1))
         return X.copy()
 
@@ -102,6 +102,7 @@ class DaysEmployedNormalizer(BaseEstimator):
                                                       row["EXP_GR_MIN"]) /
                                                      (row["EXP_GR_MAX"] -
                                                       row["EXP_GR_MIN"])), axis=1)
+        X = X.eval("DAYS_EMPLOYED = DAYS_EMPLOYED * DAYS_EMPLOYED_GR_NORM")
         return X.copy()
 
 # %%
@@ -120,6 +121,9 @@ class CustomOHEncoder(BaseEstimator):
 
     def transform(self, X, **transform_params):
         df = pd.get_dummies(X)
+        df.columns = [re.compile(r"\[|\]|<", re.IGNORECASE).sub("_", col)
+                      if any(x in str(col) for x in set(("[", "]", "<")))
+                      else col for col in df.columns.values]
         for c in self.cols:
             if c not in df:
                 df[c] = 0
@@ -158,11 +162,11 @@ class CustomQuantileDiscretizer(BaseEstimator):
     def fit(self, X, y=None, **fit_params):
         self.col_bins = {}
         for col in self.cols:
-            vals, bins = pd.qcut(x=X[col],
-                                 q=self.q,
-                                 duplicates="drop",
-                                 precision=0,
-                                 retbins=True)
+            bins = pd.qcut(x=X[col],
+                           q=self.q,
+                           duplicates="drop",
+                           precision=0,
+                           retbins=True)[1]
             self.col_bins.update({col: bins})
         return self
 
@@ -170,4 +174,56 @@ class CustomQuantileDiscretizer(BaseEstimator):
     def transform(self, X, **transform_params):
         for col in self.cols:
             X.loc[:, col] = pd.cut(X[col], self.col_bins[col])
+        return X.copy()
+
+# %%
+class ZscoreQuantileDiscretizer(BaseEstimator):
+
+    def __init__(self, bins=None, q=7):
+        self.bins = bins
+        self.q = q
+
+
+    def fit(self, X, y=None, **fit_params):
+        self.bins = pd.qcut(x=X["zscore"],
+                            q=self.q,
+                            duplicates="drop",
+                            precision=0,
+                            retbins=True)[1]
+        return self
+
+
+    def transform(self, X, **transform_params):
+        X["zscore"] = [min(self.bins) if v < min(self.bins)
+                       else max(self.bins) if v > max(self.bins)
+                       else v for v in X["zscore"]]
+
+        X["zscore_disc"] = pd.cut(X["zscore"],
+                                  self.bins,
+                                  include_lowest=True)
+        return X.copy()
+
+# %%
+class DaysEmployedZscore(BaseEstimator):
+
+    def __init__(self, exp_gr_cols, mean_std=None):
+        self.exp_gr_cols = exp_gr_cols
+        self.mean_std = mean_std
+
+
+    def fit(self, X, y=None, **fit_params):
+        self.mean_std = (X
+                         .groupby(self.exp_gr_cols)["DAYS_EMPLOYED"]
+                         .agg(["mean", "std"]))
+        return self
+
+
+    def transform(self, X, **transform_params):
+        X = (X
+             .merge(self.mean_std,
+                    how="left",
+                    left_on=self.exp_gr_cols,
+                    right_index=True))
+        X = X.eval("zscore = (DAYS_EMPLOYED - mean) / std")
+        X["zscore"].fillna(0, inplace=True)
         return X.copy()
