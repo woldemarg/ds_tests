@@ -118,3 +118,25 @@ print(1 - df["first_name"].isna().mean())
 #%%
 df.reset_index(inplace=True)
 df.to_csv("nlp/company_7/task_solution/results/data_new.csv.gz")
+
+#%%
+def get_data(line):
+    l_doc = nlp_main(line)
+    if (any([n.label_ == "academic_title" for n in l_doc.ents]) and
+            any([n.label_ == "PERSON" for n in l_doc.ents])):
+
+        names = [n.text for n in l_doc.ents if n.label_ == "PERSON"]
+        nx = np.asarray([n.start_char for n
+                         in l_doc.ents if n.label_ == "PERSON"])
+        titles = [n.text for n
+                  in l_doc.ents if n.label_ == "academic_title"]
+        ty = np.asarray([n.start_char for n
+                         in l_doc.ents if n.label_ == "academic_title"])
+
+        diff_arr = np.abs(ty - nx[:, np.newaxis])
+        min_vals = np.where(diff_arr == np.amin(diff_arr))
+        indicies = list(zip(min_vals[0], min_vals[1]))
+        return (names[indicies[0][0]], titles[indicies[0][1]])
+
+
+%timeit get_data(s_strings[1])
