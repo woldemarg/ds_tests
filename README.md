@@ -29,7 +29,11 @@
 
 ### Model deployment assignments
 1. Company 2
-* [description](https://github.com/woldemarg/ds_tests/tree/master/machine_learning/company_2/task_description) / [solution](https://github.com/woldemarg/ds_tests/tree/master/deploying_ml_project/company_2) (deploying ML pipe as an API on AWS using Docker)
+* [description](https://github.com/woldemarg/ds_tests/tree/master/machine_learning/company_2/task_description) / [solution](https://github.com/woldemarg/ds_tests/tree/master/deploying_ml_project/company_2/task_solution) (deploying ML pipe as an API on AWS using Docker)
+
+### Natural Language Processing
+1. Company 7
+* [description](https://github.com/woldemarg/ds_tests/tree/master/nlp/company_7/task_description) / [solution](https://github.com/woldemarg/ds_tests/tree/master/nlp/company_7/task_solution) (spaCy)
 
 ## Kaggle competitions
 1. Titanic: Machine Learning from Disaster
